@@ -37,7 +37,7 @@ function init() {
 
     // Verbindungen anlegen...
     for (let device of Object.keys(devices)) {
-        devices[device].connect = new Twinkly(device, devices[device].name, devices[device].ipAdresse);
+        devices[device].connect = new Twinkly(devices[device].name, devices[device].ipAdresse);
 
         // Soll der Ping-Adapter geprüft werden?
         devices[device].checkPing = !isLikeEmpty(devices[device].pingState) && isState(devices[device].pingState, true);
@@ -196,12 +196,10 @@ function init() {
 class Twinkly {
     
     /**
-    * @param {string} device
     * @param {string} name
     * @param {string} host
     */
-    constructor(device, name, host) {
-        this.device  = device;
+    constructor(name, host) {
         this.name    = name;
         this.host    = host;
         this.expires = null;
