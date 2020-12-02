@@ -1,3 +1,3 @@
-# ioBroker_twinkly
+# ioBroker.twinkly
 
 Steuerung der Twinkly Lichterketten.
