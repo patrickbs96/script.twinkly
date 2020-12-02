@@ -19,7 +19,7 @@ Für jedes angelegte Gerät können die folgenden Werte bearbeitet werden:
 - Timer
 
 Der Aufbau pro Gerät sieht wie folgt aus:
-```
+``` javascript
 Weihnachtsbaum : {
     name      : 'Weihnachtsbaum',       // Name für ioBroker
     ipAdresse : '192.168.178.53',       // IP-Adresse von der Twinkly-Lichterkette
