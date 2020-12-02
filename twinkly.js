@@ -679,7 +679,7 @@ function httpRequest(url, body, method, addOptions = null) {
                     options[option] = addOptions[option]
         }
     
-        if (logs) logs.debug(`[httpRequest.${method}] ${JSON.stringify(options)}`);
+        console.debug(`[httpRequest.${method}] ${JSON.stringify(options)}`);
         request(options, function (error, response, body) {
             const err = error ? error : (response && response.statusCode !== 200 ? 'HTTP Error ' + response.statusCode : null)
             if (err) reject(err);
