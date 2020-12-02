@@ -649,10 +649,9 @@ function createChannel(id, initValue, forceCreation = false, name = '', common =
 * @param {string | {} } body
 * @param {string} method
 * @param {function | {} } addOptions
-* @param {myLogs} logs
 * @return {Promise<{response: any, body: any}>}
 */
-function httpRequest(url, body, method, addOptions = null, logs = null) {
+function httpRequest(url, body, method, addOptions = null) {
     return new Promise((resolve, reject) => {
         if (url == '') {
             reject(`invalid ${method} URL`);
@@ -695,15 +694,14 @@ function httpRequest(url, body, method, addOptions = null, logs = null) {
 /**
 * @param {string} url
 * @param {function | {} } addOptions
-* @param {myLogs} logs
 * @return {Promise<{response: any, body: any}>}
 */
-function doGetRequest(url, addOptions = null, logs = null) {
+function doGetRequest(url, addOptions = null) {
     return new Promise((resolve, reject) => {
-        httpRequest(url, null, 'GET', addOptions, logs)
+        httpRequest(url, null, 'GET', addOptions)
         .then(({response, body}) => {
-            if (response && logs) logs.silly('[doGetRequest] response: ' + JSON.stringify(response).substr(0,200));
-            if (body     && logs) logs.silly('[doGetRequest] body: '     + JSON.stringify(body).substr(0,200));
+            if (response) console.debug('[doGetRequest] response: ' + JSON.stringify(response).substr(0,200));
+            if (body)     console.debug('[doGetRequest] body: '     + JSON.stringify(body).substr(0,200));
 
             resolve({response: response, body: body});
         })
@@ -717,15 +715,14 @@ function doGetRequest(url, addOptions = null, logs = null) {
 * @param {string} url
 * @param {string | {} } body
 * @param {function | {} } addOptions
-* @param {myLogs} logs
 * @return {Promise<{response: any, body: any}>}
 */
-function doPostRequest(url, body, addOptions = null, logs = null) {
+function doPostRequest(url, body, addOptions = null) {
     return new Promise((resolve, reject) => {
-        httpRequest(url, body, 'POST', addOptions, logs)
+        httpRequest(url, body, 'POST', addOptions)
         .then(({response, body}) => {
-            if (response && logs) logs.silly('[doPostRequest] response: ' + JSON.stringify(response).substr(0,200));
-            if (body     && logs) logs.silly('[doPostRequest] body: '     + JSON.stringify(body).substr(0,200));
+            if (response) console.debug('[doPostRequest] response: ' + JSON.stringify(response).substr(0,200));
+            if (body)     console.debug('[doPostRequest] body: '     + JSON.stringify(body).substr(0,200));
 
             resolve({response: response, body: body});
         })
