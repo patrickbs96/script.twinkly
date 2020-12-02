@@ -242,7 +242,7 @@ class Twinkly {
         
         return new Promise((resolve, reject) => {
             // exec(`curl -d '${JSON.stringify(data)}' -H 'Content-Type: application/json X-Auth-Token: ${this.token}'  ${this.base() + '/' + path}`, (error, response, body) => {
-            doPostRequest(this.base() + '/' + path, data, {headers: headers}, console)
+            doPostRequest(this.base() + '/' + path, data, {headers: headers})
             .then(({response, body}) => {
                 try {
                     resolve(body);
@@ -267,7 +267,7 @@ class Twinkly {
 
         return new Promise((resolve, reject) => {
             // exec(`curl -H 'Content-Type: application/json X-Auth-Token: ${this.token}'  ${this.base() + '/' + path}`, (error, response, body) => {
-            doGetRequest(this.base() + '/' + path, {headers: this.headers}, console)
+            doGetRequest(this.base() + '/' + path, {headers: this.headers})
             .then(({response, body}) => {
                 try {
                     resolve(body);
@@ -316,7 +316,7 @@ class Twinkly {
         this.token = '';
         return new Promise((resolve, reject) => {
             // exec(`curl -d '${JSON.stringify({'challenge': 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8='})}' -H 'Content-Type: application/json'  ${this.base() + '/login'}`, (error, response, body) => {
-            doPostRequest(TWINKLY_OBJ.base() + '/login', {'challenge': 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8='}, null, console)
+            doPostRequest(TWINKLY_OBJ.base() + '/login', {'challenge': 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8='}, null)
             .then(({response, body}) => {
                 try {
                     TWINKLY_OBJ.token                   = body['authentication_token'];
