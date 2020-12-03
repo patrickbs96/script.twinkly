@@ -3,7 +3,7 @@
 Steuerung der Twinkly Lichterketten.
 
 Für jedes angelegte Gerät werden die folgenden Informationen ausgelesen:
-- Mode
+- Mode (An/Aus)
 - Helligkeit
 - Name
 - MQTT
@@ -12,7 +12,7 @@ Für jedes angelegte Gerät werden die folgenden Informationen ausgelesen:
 - Firmware Version
 
 Für jedes angelegte Gerät können die folgenden Werte bearbeitet werden:
-- Mode
+- Mode (An/Aus)
 - Helligkeit
 - Name
 - MQTT
