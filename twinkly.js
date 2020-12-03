@@ -740,8 +740,8 @@ function doGetRequest(url, addOptions = null) {
     return new Promise((resolve, reject) => {
         httpRequest(url, null, 'GET', addOptions)
         .then(({response, body}) => {
-            if (response) console.debug('[doGetRequest] response: ' + JSON.stringify(response).substr(0,200));
-            if (body)     console.debug('[doGetRequest] body: '     + JSON.stringify(body).substr(0,200));
+            if (response) console.debug('[doGetRequest] response: ' + JSON.stringify(response));
+            if (body)     console.debug('[doGetRequest] body: '     + JSON.stringify(body));
 
             resolve({response: response, body: body});
         })
@@ -761,8 +761,8 @@ function doPostRequest(url, body, addOptions = null) {
     return new Promise((resolve, reject) => {
         httpRequest(url, body, 'POST', addOptions)
         .then(({response, body}) => {
-            if (response) console.debug('[doPostRequest] response: ' + JSON.stringify(response).substr(0,200));
-            if (body)     console.debug('[doPostRequest] body: '     + JSON.stringify(body).substr(0,200));
+            if (response) console.debug('[doPostRequest] response: ' + JSON.stringify(response));
+            if (body)     console.debug('[doPostRequest] body: '     + JSON.stringify(body));
 
             resolve({response: response, body: body});
         })
