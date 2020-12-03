@@ -253,13 +253,13 @@ class Twinkly {
         await this.ensure_token().catch(error => {throw Error(error);});
         
         return new Promise((resolve, reject) => {
-            // exec(`curl -d '${JSON.stringify(data)}' -H 'Content-Type: application/json X-Auth-Token: ${this.token}'  ${this.base() + '/' + path}`, (error, response, body) => {
             doPostRequest(this.base() + '/' + path, data, {headers: headers})
             .then(({response, body}) => {
                 try {
-                    if (!translateTwinklyCode('POST', path, body.code)) {
-                        console.warn(JSON.stringify(body));
-                        reject(body.code + ': ' + HTTPCodes_TXT[body.code]);
+                    let checkTwinklyCode = translateTwinklyCode('POST', path, body.code);
+
+                    if (checkTwinklyCode) {
+                        reject(`${checkTwinklyCode}, Data: ${JSON.stringify(data)}, Headers: ${JSON.stringify(headers)}, Body: ${JSON.stringify(body)}`);
                     } else
                         resolve(body);
                 } catch (e) {
@@ -282,13 +282,13 @@ class Twinkly {
         await this.ensure_token().catch(error => {throw Error(error);});
 
         return new Promise((resolve, reject) => {
-            // exec(`curl -H 'Content-Type: application/json X-Auth-Token: ${this.token}'  ${this.base() + '/' + path}`, (error, response, body) => {
             doGetRequest(this.base() + '/' + path, {headers: this.headers})
             .then(({response, body}) => {
                 try {
-                    if (!translateTwinklyCode('GET', path, body.code)) {
-                        reject(body.code + ': ' + HTTPCodes_TXT[body.code]);
-                        console.warn(JSON.stringify(body));
+                    let checkTwinklyCode = translateTwinklyCode('GET', path, body.code);
+
+                    if (checkTwinklyCode) {
+                        reject(`${checkTwinklyCode}, Headers: ${JSON.stringify(this.headers)}, Body: ${JSON.stringify(body)}`);
                     } else
                         resolve(body);
                 } catch (e) {
@@ -335,13 +335,13 @@ class Twinkly {
 
         this.token = '';
         return new Promise((resolve, reject) => {
-            // exec(`curl -d '${JSON.stringify({'challenge': 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8='})}' -H 'Content-Type: application/json'  ${this.base() + '/login'}`, (error, response, body) => {
             doPostRequest(TWINKLY_OBJ.base() + '/login', {'challenge': 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8='}, null)
             .then(({response, body}) => {
                 try {
-                    if (!translateTwinklyCode('POST', '/login', body.code)) {
-                        reject(body.code + ': ' + HTTPCodes_TXT[body.code]);
-                        console.warn(JSON.stringify(body));
+                    let checkTwinklyCode = translateTwinklyCode('POST', 'login', body.code);
+
+                    if (checkTwinklyCode) {
+                        reject(`${checkTwinklyCode}, Body: ${JSON.stringify(body)}`);
                     } else {
                         TWINKLY_OBJ.token                   = body['authentication_token'];
                         TWINKLY_OBJ.headers['X-Auth-Token'] = TWINKLY_OBJ.token;
@@ -349,9 +349,9 @@ class Twinkly {
                         TWINKLY_OBJ.challengeResponse       = body['challenge-response'];
 
                         resolve({authentication_token            : body['authentication_token'], 
-                                authentication_token_expires_in : body['authentication_token_expires_in'], 
-                                'challenge-response'            : body['challenge-response'], 
-                                code                            : body['code']});
+                                 authentication_token_expires_in : body['authentication_token_expires_in'], 
+                                 'challenge-response'            : body['challenge-response'], 
+                                 code                            : body['code']});
                     }
                 } catch (e) {
                     reject(e.name + ': ' + e.message);
@@ -620,7 +620,7 @@ class Twinkly {
     //             'leds_number': self.length,
     //         }
     //     )
-    //     await self.set_mode('movie')
+    //     await self.set_mode(MODES.on)
     // }
 }
 
@@ -657,11 +657,8 @@ const
 
 
 function translateTwinklyCode(mode, path, code) {
-    if (code != HTTPCodes.ok) {
-        console.warn(`${mode}: ${path} - ${code} (${HTTPCodes_TXT[code]})`);
-        return false;
-    } else 
-        return true;
+    if (code != HTTPCodes.ok) 
+        return `<${mode} /${path}> - ${code} (${HTTPCodes_TXT[code]})`;
 }
 
 init();
