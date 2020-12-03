@@ -21,9 +21,9 @@ Für jedes angelegte Gerät können die folgenden Werte bearbeitet werden:
 Der Aufbau pro Gerät sieht wie folgt aus:
 ``` javascript
 Weihnachtsbaum : {
-    name      : 'Weihnachtsbaum',       // Name für ioBroker
-    ipAdresse : '192.168.178.53',       // IP-Adresse von der Twinkly-Lichterkette
-    pingState : 'ping.0.192_168_178_53' // State vom Ping-Adapter, um zu prüfen ob Lichterkette verbunden ist.
-} 
+    name           : 'Twinkly Weihnachtsbaum',       // Name für ioBroker (Falls nicht hinterlegt wird in diesem Fall "Weihnachtsbaum" genommen)
+    ipAdresse      : '192.168.178.53',               // IP-Adresse von der Twinkly-Lichterkette
+    connectedState : 'ping.0.Twinkly_Weihnachtsbaum' // State mit true/false der den aktuellen Status der Lichterkette überwacht (bspw. ping, tr-064)
+}
 ```
-pingState ist nicht verpflichtend aber so kann das Polling gegen eine nicht existierende Verbindung (Lichterkette vom Strom getrennt) abgesichert werden.
+connectedState ist nicht verpflichtend aber so kann das Polling gegen eine nicht existierende Verbindung (Lichterkette vom Strom getrennt) abgesichert werden.
