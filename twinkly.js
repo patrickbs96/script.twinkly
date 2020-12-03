@@ -19,6 +19,8 @@
  *  1.0   patrickbs96   * Initial release
  *******************************************************************************/
 
+
+
 /*******************************************************************************
  * Settings
  *******************************************************************************/
@@ -26,9 +28,9 @@ const PATH_ID = 'javascript.0.MyDevices.Twinkly.';
 
 const devices = {
     Weihnachtsbaum : {
-        name      : 'Weihnachtsbaum',       // Name für ioBroker
-        ipAdresse : '192.168.178.53',       // IP-Adresse von der Twinkly-Lichterkette
-        pingState : 'ping.0.192_168_178_53' // State vom Ping-Adapter, um zu prüfen ob Lichterkette verbunden ist.
+        name           : 'Weihnachtsbaum',               // Name für ioBroker
+        ipAdresse      : '192.168.178.53',               // IP-Adresse von der Twinkly-Lichterkette
+        connectedState : 'ping.0.Twinkly_Weihnachtsbaum' // State mit true/false der den aktuellen Status der Lichterkette überwacht (bspw. ping, tr-064)
     }
 };
 
@@ -37,13 +39,17 @@ function init() {
 
     // Verbindungen anlegen...
     for (let device of Object.keys(devices)) {
-        devices[device].connect = new Twinkly(devices[device].name, devices[device].ipAdresse);
+        let deviceName = devices[device].name;
+        if (isLikeEmpty(deviceName))
+            deviceName = device;
+
+        devices[device].connect = new Twinkly(deviceName, devices[device].ipAdresse);
 
         // Soll der Ping-Adapter geprüft werden?
-        devices[device].checkPing = !isLikeEmpty(devices[device].pingState) && isState(devices[device].pingState, true);
+        devices[device].checkConnected = !isLikeEmpty(devices[device].connectedState) && isState(devices[device].connectedState, true);
 
         // Gerät anlegen...
-        createChannel(PATH_ID + device, '', false, devices[device].name);
+        createChannel(PATH_ID + device, '', false, deviceName);
 
         // States nur anlegen und Trigger anmelden, wenn eine IP-Adresse hinzugefügt wurde.
         if (devices[device].ipAdresse != '') {
@@ -54,40 +60,41 @@ function init() {
             // Ein-/Ausschalten
             id = PATH_ID + device + '.on';
             subscribe += (subscribe != '' ? '|' : '') + id;
-            createState(id, false, false, {name: devices[device].name + ' eingeschaltet', read: true, write: true, type: 'boolean', role: 'switch'});
+            createState(id, false, false, {name: deviceName + ' eingeschaltet', read: true, write: true, type: 'boolean', role: 'switch'});
 
             // Mode
             id = PATH_ID + device + '.mode';
             subscribe += (subscribe != '' ? '|' : '') + id;
-            createState(id, '', false, {name: devices[device].name + ' Mode', read: true, write: true, type: 'string', role: 'state', states: MODES_TXT});
+            createState(id, '', false, {name: deviceName + ' Mode', read: true, write: true, type: 'string', role: 'state', states: MODES_TXT});
 
             // Beleuchtung
             id = PATH_ID + device + '.bri';
             subscribe += (subscribe != '' ? '|' : '') + id;
-            createState(id, 0, false, {name: devices[device].name + ' Helligkeit', read: true, write: true, type: 'number', role: 'level.dimmer', min: 0, max: 100, def: 0});
+            createState(id, 0, false, {name: deviceName + ' Helligkeit', read: true, write: true, type: 'number', role: 'level.dimmer', min: 0, max: 100, def: 0});
 
             // Name
             id = PATH_ID + device + '.name';
             subscribe += (subscribe != '' ? '|' : '') + id;
-            createState(id, '', false, {name: devices[device].name + ' Name', read: true, write: true, type: 'string', role: 'state'});
+            createState(id, '', false, {name: deviceName + ' Name', read: true, write: true, type: 'string', role: 'state'});
 
             // MQTT
             id = PATH_ID + device + '.mqtt';
             subscribe += (subscribe != '' ? '|' : '') + id;
-            createState(id, '', false, {name: devices[device].name + ' MQTT', read: true, write: true, type: 'string', role: 'state'});
+            createState(id, '', false, {name: deviceName + ' MQTT', read: true, write: true, type: 'string', role: 'state'});
 
             // Timer
             id = PATH_ID + device + '.timer';
             subscribe += (subscribe != '' ? '|' : '') + id;
-            createState(id, '', false, {name: devices[device].name + ' Timer', read: true, write: true, type: 'string', role: 'state'});
+            createState(id, '', false, {name: deviceName + ' Timer', read: true, write: true, type: 'string', role: 'state'});
 
             // Details
-            id = PATH_ID + device + '.details';
-            createState(id, '', false, {name: devices[device].name + ' Details', read: true, write: false, type: 'string', role: 'state'});
+            createState(PATH_ID + device + '.details', '', false, {name: deviceName + ' Details', read: true, write: false, type: 'string', role: 'state'});
 
             // Firmware
-            id = PATH_ID + device + '.firmware';
-            createState(id, '', false, {name: devices[device].name + ' Firmware', read: true, write: false, type: 'string', role: 'state'});
+            createState(PATH_ID + device + '.firmware', '', false, {name: deviceName + ' Firmware', read: true, write: false, type: 'string', role: 'state'});
+
+            // Verbunden
+            createState(PATH_ID + device + '.connected', false, false, {name: deviceName + ' Verbunden', read: true, write: false, type: 'boolean', role: 'indicator.connected'});
             /*******************************************************************************/
         }
 
@@ -105,7 +112,7 @@ function init() {
                     }
 
                     // Nur ausführen, wenn Gerät verbunden ist!
-                    if (devices[device].checkPing && !getState(devices[device].pingState).val) return;
+                    if (devices[device].checkConnected && !getState(devices[device].connectedState).val) return;
 
                     /*******************************************************************************
                      * Daten ändern
@@ -151,16 +158,21 @@ function init() {
                     for (let device of Object.keys(devices)) {
                         if (devices[device].ipAdresse == '') continue;
                         
-                        // Nur ausführen, wenn Gerät verbunden ist!
-                        if (devices[device].checkPing && !getState(devices[device].pingState).val) continue;
+                        // Connected abfragen
+                        if (devices[device].checkConnected) {
+                            let connected = getState(devices[device].connectedState).val;
+                            setState(PATH_ID + device + '.connected', connected, true);
+
+                            // Nur ausführen, wenn Gerät verbunden ist!
+                            if (!connected) continue;
+                        }
 
                         await devices[device].connect.get_mode()
-                        .then(({mode}) => {setState(PATH_ID + device + '.on', mode != MODES.off, true);})
+                        .then(({mode}) => {
+                            setState(PATH_ID + device + '.mode', mode, true);
+                            setState(PATH_ID + device + '.on',   mode != MODES.off, true);
+                        })
                         .catch(error => {console.error(`[Twinkly.${device}.on] ${error}`)});
-
-                        await devices[device].connect.get_mode()
-                        .then(({mode}) => {setState(PATH_ID + device + '.mode', mode, true);})
-                        .catch(error => {console.error(`[Twinkly.${device}.mode] ${error}`)});
                             
                         await devices[device].connect.get_brightness()
                         .then(({value}) => {setState(PATH_ID + device + '.bri', value, true);})
@@ -245,7 +257,11 @@ class Twinkly {
             doPostRequest(this.base() + '/' + path, data, {headers: headers})
             .then(({response, body}) => {
                 try {
-                    resolve(body);
+                    if (!translateTwinklyCode('POST', path, body.code)) {
+                        console.warn(JSON.stringify(body));
+                        reject(body.code + ': ' + HTTPCodes_TXT[body.code]);
+                    } else
+                        resolve(body);
                 } catch (e) {
                     reject(e.name + ': ' + e.message);
                 }
@@ -270,7 +286,11 @@ class Twinkly {
             doGetRequest(this.base() + '/' + path, {headers: this.headers})
             .then(({response, body}) => {
                 try {
-                    resolve(body);
+                    if (!translateTwinklyCode('GET', path, body.code)) {
+                        reject(body.code + ': ' + HTTPCodes_TXT[body.code]);
+                        console.warn(JSON.stringify(body));
+                    } else
+                        resolve(body);
                 } catch (e) {
                     reject(e.name + ': ' + e.message);
                 }
@@ -319,15 +339,20 @@ class Twinkly {
             doPostRequest(TWINKLY_OBJ.base() + '/login', {'challenge': 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8='}, null)
             .then(({response, body}) => {
                 try {
-                    TWINKLY_OBJ.token                   = body['authentication_token'];
-                    TWINKLY_OBJ.headers['X-Auth-Token'] = TWINKLY_OBJ.token;
-                    TWINKLY_OBJ.expires                 = Date.now() + body['authentication_token_expires_in'];
-                    TWINKLY_OBJ.challengeResponse       = body['challenge-response'];
+                    if (!translateTwinklyCode('POST', '/login', body.code)) {
+                        reject(body.code + ': ' + HTTPCodes_TXT[body.code]);
+                        console.warn(JSON.stringify(body));
+                    } else {
+                        TWINKLY_OBJ.token                   = body['authentication_token'];
+                        TWINKLY_OBJ.headers['X-Auth-Token'] = TWINKLY_OBJ.token;
+                        TWINKLY_OBJ.expires                 = Date.now() + body['authentication_token_expires_in'];
+                        TWINKLY_OBJ.challengeResponse       = body['challenge-response'];
 
-                    resolve({authentication_token            : body['authentication_token'], 
-                             authentication_token_expires_in : body['authentication_token_expires_in'], 
-                             'challenge-response'            : body['challenge-response'], 
-                             code                            : body['code']});
+                        resolve({authentication_token            : body['authentication_token'], 
+                                authentication_token_expires_in : body['authentication_token_expires_in'], 
+                                'challenge-response'            : body['challenge-response'], 
+                                code                            : body['code']});
+                    }
                 } catch (e) {
                     reject(e.name + ': ' + e.message);
                 }
@@ -615,12 +640,29 @@ const
         effect : 'Effect'},
 
     HTTPCodes = {
-        1100 : 'OK',
+        ok         : 1000,
+        invalid    : 1101,
+        error      : 1102,
+        errorValue : 1103,
+        errorJSON  : 1104,
+        invalidKey : 1105},
+
+    HTTPCodes_TXT = {
+        1000 : 'OK',
         1101 : 'Invalid argument value',
         1102 : 'Error',
         1103 : 'Error - value too long',
         1104 : 'Error - malformed JSON on input',
         1105 : 'Invalid argument key'};
+
+
+function translateTwinklyCode(mode, path, code) {
+    if (code != HTTPCodes.ok) {
+        console.warn(`${mode}: ${path} - ${code} (${HTTPCodes_TXT[code]})`);
+        return false;
+    } else 
+        return true;
+}
 
 init();
 
