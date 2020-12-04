@@ -107,7 +107,7 @@ function init() {
                         device  = device.substring(device.lastIndexOf('.')+1);
 
                     if (!Object.keys(devices).includes(device)) {
-                        console.error(`[Twinkly.${device}] Existiert nicht!`);
+                        console.error(`[${device}] Existiert nicht!`);
                         return;
                     }
 
@@ -120,32 +120,32 @@ function init() {
                     // Gerät ein-/ausschalten
                     if (command == '.on') {
                         devices[device].connect.set_mode(obj.state.val ? MODES.on : MODES.off)
-                        .catch(error => {console.error(`[Twinkly.${device}.on] ${error}`)});
+                        .catch(error => {console.error(`[${device}.on] ${error}`)});
                     
                     // Mode anpassen
                     } else if (command == '.mode') {
                         devices[device].connect.set_mode(obj.state.val)
-                        .catch(error => {console.error(`[Twinkly.${device}.mode] ${error}`)});
+                        .catch(error => {console.error(`[${device}.mode] ${error}`)});
                     
                     // Helligkeit anpassen
                     } else if (command == '.bri') {
                         devices[device].connect.set_brightness(obj.state.val)
-                        .catch(error => {console.error(`[Twinkly.${device}.bri] ${error}`)});
+                        .catch(error => {console.error(`[${device}.bri] ${error}`)});
                     
                     // Namen anpassen
                     } else if (command == '.name') {
                         devices[device].connect.set_name(obj.state.val)
-                        .catch(error => {console.error(`[Twinkly.${device}.name] ${error}`)});
+                        .catch(error => {console.error(`[${device}.name] ${error}`)});
                     
                     // MQTT anpassen
                     } else if (command == '.mqtt') {
                         devices[device].connect.set_mqtt_str(obj.state.val)
-                        .catch(error => {console.error(`[Twinkly.${device}.mqtt] ${error}`)});
+                        .catch(error => {console.error(`[${device}.mqtt] ${error}`)});
                     
                     // Timer anpassen
                     } else if (command == '.timer') {
                         devices[device].connect.set_mqtt_str(obj.state.val)
-                        .catch(error => {console.error(`[Twinkly.${device}.timer] ${error}`)});
+                        .catch(error => {console.error(`[${device}.timer] ${error}`)});
                     }
                     /*******************************************************************************/
                 });
@@ -172,31 +172,31 @@ function init() {
                             setState(PATH_ID + device + '.mode', mode, true);
                             setState(PATH_ID + device + '.on',   mode != MODES.off, true);
                         })
-                        .catch(error => {console.error(`[Twinkly.${device}.on] ${error}`)});
+                        .catch(error => {console.error(`[${device}.on] ${error}`)});
                             
                         await devices[device].connect.get_brightness()
                         .then(({value}) => {setState(PATH_ID + device + '.bri', value, true);})
-                        .catch(error => {console.error(`[Twinkly.${device}.bri] ${error}`)});
+                        .catch(error => {console.error(`[${device}.bri] ${error}`)});
 
                         await devices[device].connect.get_name()
                         .then(({name}) => {setState(PATH_ID + device + '.name', name, true);})
-                        .catch(error => {console.error(`[Twinkly.${device}.name] ${error}`)});
+                        .catch(error => {console.error(`[${device}.name] ${error}`)});
 
                         await devices[device].connect.get_mqtt()
                         .then(({mqtt}) => {setState(PATH_ID + device + '.mqtt', JSON.stringify(mqtt), true);})
-                        .catch(error => {console.error(`[Twinkly.${device}.mqtt] ${error}`)});
+                        .catch(error => {console.error(`[${device}.mqtt] ${error}`)});
 
                         await devices[device].connect.get_timer()
                         .then(({timer}) => {setState(PATH_ID + device + '.timer', JSON.stringify(timer), true);})
-                        .catch(error => {console.error(`[Twinkly.${device}.timer] ${error}`)});
+                        .catch(error => {console.error(`[${device}.timer] ${error}`)});
 
                         await devices[device].connect.get_details()
                         .then(({details}) => {setState(PATH_ID + device + '.details', JSON.stringify(details), true);})
-                        .catch(error => {console.error(`[Twinkly.${device}.details] ${error}`)});
+                        .catch(error => {console.error(`[${device}.details] ${error}`)});
 
                         await devices[device].connect.get_firmware_version()
                         .then(({version}) => {setState(PATH_ID + device + '.firmware', version, true);})
-                        .catch(error => {console.error(`[Twinkly.${device}.firmware] ${error}`)});
+                        .catch(error => {console.error(`[${device}.firmware] ${error}`)});
                     }
                     /*******************************************************************************/
                 });
@@ -246,29 +246,33 @@ class Twinkly {
     * @return {Promise<{}>} 
     */
     async _post(path, data, headers = {}) {
-        console.debug(`[Twinkly.${this.name}._post] <${path}> ${JSON.stringify(data)}`);
+        console.debug(`[${this.name}._post] <${path}> ${JSON.stringify(data)}`);
 
         if (Object.keys(headers).length == 0) headers = this.headers;
 
-        await this.ensure_token().catch(error => {throw Error(error);});
+        let resultError;
+        await this.ensure_token().catch(error => {resultError = error;});
         
         return new Promise((resolve, reject) => {
-            doPostRequest(this.base() + '/' + path, data, {headers: headers})
-            .then(({response, body}) => {
-                try {
-                    let checkTwinklyCode = translateTwinklyCode('POST', path, body.code);
-
-                    if (checkTwinklyCode) {
-                        reject(`${checkTwinklyCode}, Data: ${JSON.stringify(data)}, Headers: ${JSON.stringify(headers)}, Body: ${JSON.stringify(body)}`);
-                    } else
+            if (resultError)
+                reject(resultError)
+            else {
+                doPostRequest(this.base() + '/' + path, data, {headers: headers})
+                .then(({response, body}) => {
+                    try {
+                        let checkTwinklyCode = translateTwinklyCode('POST', path, body.code);
+                        if (checkTwinklyCode)
+                            console.warn(`${checkTwinklyCode}, Data: ${JSON.stringify(data)}, Headers: ${JSON.stringify(headers)}, Body: ${JSON.stringify(body)}`);
+                        
                         resolve(body);
-                } catch (e) {
-                    reject(e.name + ': ' + e.message);
-                }
-            })
-            .catch(error => {
-                reject(error);
-            });
+                    } catch (e) {
+                        reject(e.name + ': ' + e.message);
+                    }
+                })
+                .catch(error => {
+                    reject(error);
+                });
+            }
         });
     }
 
@@ -277,27 +281,31 @@ class Twinkly {
     * @return {Promise<{}>}
     */
     async _get(path) {
-        console.debug(`[Twinkly.${this.name}._get] <${path}>`);
+        console.debug(`[${this.name}._get] <${path}>`);
 
-        await this.ensure_token().catch(error => {throw Error(error);});
+        let resultError;
+        await this.ensure_token().catch(error => {resultError = error;});
 
         return new Promise((resolve, reject) => {
-            doGetRequest(this.base() + '/' + path, {headers: this.headers})
-            .then(({response, body}) => {
-                try {
-                    let checkTwinklyCode = translateTwinklyCode('GET', path, body.code);
-
-                    if (checkTwinklyCode) {
-                        reject(`${checkTwinklyCode}, Headers: ${JSON.stringify(this.headers)}, Body: ${JSON.stringify(body)}`);
-                    } else
+            if (resultError)
+                reject(resultError)
+            else {
+                doGetRequest(this.base() + '/' + path, {headers: this.headers})
+                .then(({response, body}) => {
+                    try {
+                        let checkTwinklyCode = translateTwinklyCode('GET', path, body.code);
+                        if (checkTwinklyCode)
+                            console.warn(`${checkTwinklyCode}, Headers: ${JSON.stringify(this.headers)}, Body: ${JSON.stringify(body)}`);
+                        
                         resolve(body);
-                } catch (e) {
-                    reject(e.name + ': ' + e.message);
-                }
-            })
-            .catch(error => {
-                reject(error);
-            });
+                    } catch (e) {
+                        reject(e.name + ': ' + e.message);
+                    }
+                })
+                .catch(error => {
+                    reject(error);
+                });
+            }
         });
     }
     
@@ -307,24 +315,22 @@ class Twinkly {
     async ensure_token() {
         const TWINKLY_OBJ = this;
 
-        try {
-            if (TWINKLY_OBJ.token == '' || TWINKLY_OBJ.expires == null || TWINKLY_OBJ.expires <= Date.now()) {
-                console.debug(`[Twinkly.${TWINKLY_OBJ.name}.ensure_token] Authentication token expired, will refresh`);
-                await TWINKLY_OBJ.login()
-                .catch(error => {
-                    throw Error(error);
-                });
-                TWINKLY_OBJ.verify_login()
-                .catch(error => {
-                    throw Error(error);
-                });
+        if (TWINKLY_OBJ.token == '' || TWINKLY_OBJ.expires == null || TWINKLY_OBJ.expires <= Date.now()) {
+            console.debug(`[${TWINKLY_OBJ.name}.ensure_token] Authentication token expired, will refresh`);
 
-                return TWINKLY_OBJ.token;
-            } else
-                console.debug(`[Twinkly.${TWINKLY_OBJ.name}.ensure_token] Authentication token still valid`);
-        } catch (e) {
-            throw Error(e.message);
-        }
+            let resultError;
+            await TWINKLY_OBJ.login().catch(error => {resultError = error;});
+            if (!resultError)
+                await TWINKLY_OBJ.verify_login().catch(error => {resultError = error;});
+
+            return new Promise((resolve, reject) => {
+                if (resultError)
+                    reject(resultError)
+                else
+                    resolve(TWINKLY_OBJ.token);
+            });
+        } else
+            console.debug(`[${TWINKLY_OBJ.name}.ensure_token] Authentication token still valid`);
     }
 
     /**
@@ -339,20 +345,18 @@ class Twinkly {
             .then(({response, body}) => {
                 try {
                     let checkTwinklyCode = translateTwinklyCode('POST', 'login', body.code);
+                    if (checkTwinklyCode)
+                        console.warn(`${checkTwinklyCode}, Body: ${JSON.stringify(body)}`);
 
-                    if (checkTwinklyCode) {
-                        reject(`${checkTwinklyCode}, Body: ${JSON.stringify(body)}`);
-                    } else {
-                        TWINKLY_OBJ.token                   = body['authentication_token'];
-                        TWINKLY_OBJ.headers['X-Auth-Token'] = TWINKLY_OBJ.token;
-                        TWINKLY_OBJ.expires                 = Date.now() + body['authentication_token_expires_in'];
-                        TWINKLY_OBJ.challengeResponse       = body['challenge-response'];
+                    TWINKLY_OBJ.token                   = body['authentication_token'];
+                    TWINKLY_OBJ.headers['X-Auth-Token'] = TWINKLY_OBJ.token;
+                    TWINKLY_OBJ.expires                 = Date.now() + body['authentication_token_expires_in'];
+                    TWINKLY_OBJ.challengeResponse       = body['challenge-response'];
 
-                        resolve({authentication_token            : body['authentication_token'], 
-                                 authentication_token_expires_in : body['authentication_token_expires_in'], 
-                                 'challenge-response'            : body['challenge-response'], 
-                                 code                            : body['code']});
-                    }
+                    resolve({authentication_token            : body['authentication_token'], 
+                             authentication_token_expires_in : body['authentication_token_expires_in'], 
+                             'challenge-response'            : body['challenge-response'], 
+                             code                            : body['code']});
                 } catch (e) {
                     reject(e.name + ': ' + e.message);
                 }
@@ -368,10 +372,17 @@ class Twinkly {
      */
     async logout() {
         if (this.token != '') {
-            const response = await this._post('logout', {}).catch(error => {throw Error(error)});
-            this.token = '';
-
-            return {code: response['code']};
+            let resultError;
+            const response = await this._post('logout', {}).catch(error => {resultError = error;});
+            
+            return new Promise((resolve, reject) => {
+                if (resultError)
+                    reject(resultError)
+                else {
+                    this.token = '';
+                    resolve({code: response['code']});
+                }
+            });
         }
     }
 
@@ -379,20 +390,35 @@ class Twinkly {
      * @return {Promise<{code: Number; }>} 
      */
     async verify_login() {
-        if (this.challengeResponse != '') {
-            const response = await this._post('verify', {'challenge-response': this.challengeResponse}).catch(error => {throw Error(error)});
-            return {code: response['code']};
-        } else {
-            throw Error('Challenge-Response nicht gefüllt!');
+        let result, resultError;
+        if (this.challengeResponse == '') 
+            resultError = 'Challenge-Response nicht gefüllt!'
+        else {
+            const response = await this._post('verify', {'challenge-response': this.challengeResponse}).catch(error => {resultError = error;});
+            result = {code: response['code']};
         }
+        
+        return new Promise((resolve, reject) => {
+            if (resultError)
+                reject(resultError)
+            else
+                resolve(result);
+        });
     }
 
     /** 
      * @return {Promise<{name: String; code: Number; }>} 
      */
     async get_name() {
-        const response = await this._get('device_name').catch(error => {throw Error(error)});
-        return {name: response['name'], code: response['code']};
+        let resultError;
+        const response = await this._get('device_name').catch(error => {resultError = error;});
+        
+        return new Promise((resolve, reject) => {
+            if (resultError)
+                reject(resultError)
+            else
+                resolve({name: response['name'], code: response['code']});
+        });
     }
 
     /**
@@ -400,24 +426,45 @@ class Twinkly {
      * @return {Promise<{name: String; code: Number; }>} 
      */
     async set_name(name) {
-        const response = await this._post('device_name', {'name': name}).catch(error => {throw Error(error)});
-        return {name: response['name'], code: response['code']};
+        let resultError;
+        const response = await this._post('device_name', {'name': name}).catch(error => {resultError = error;});
+        
+        return new Promise((resolve, reject) => {
+            if (resultError)
+                reject(resultError)
+            else
+                resolve({name: response['name'], code: response['code']});
+        });
     }
 
     /**
      * @return {Promise<{code: Number; }>} 
      */
     async reset() {
-        const response = await this._get('reset').catch(error => {throw Error(error)});
-        return {code: response['code']};
+        let resultError;
+        const response = await this._get('reset').catch(error => {resultError = error;});        
+        
+        return new Promise((resolve, reject) => {
+            if (resultError)
+                reject(resultError)
+            else
+                resolve({code: response['code']});
+        });
     }
 
     /** 
-     * @return {Promise<{}>} 
+     * @return {Promise<void | {}>} 
      */
     async get_network_status() {
-        const response = await this._get('network/status').catch(error => {throw Error(error)});
-        return response; //{ code: response['code']};
+        let resultError;
+        const response = await this._get('network/status').catch(error => {resultError = error;});        
+        
+        return new Promise((resolve, reject) => {
+            if (resultError)
+                reject(resultError)
+            else
+                resolve(response) //{code: response['code']});
+        });
     }
 
     /** 
@@ -432,8 +479,15 @@ class Twinkly {
      * @return {Promise<{timer: {time_now: Number; time_on: Number; time_off: Number;}; code: Number; }>} 
      */
     async get_timer() {
-        const response = await this._get('timer').catch(error => {throw Error(error)});
-        return {timer: {time_now: response['time_now'], time_on: response['time_on'], time_off: response['time_off']}, code: response['code']};
+        let resultError;
+        const response = await this._get('timer').catch(error => {resultError = error;});        
+        
+        return new Promise((resolve, reject) => {
+            if (resultError)
+                reject(resultError)
+            else
+                resolve({timer: {time_now: response['time_now'], time_on: response['time_on'], time_off: response['time_off']}, code: response['code']});
+        });
     }
 
     /**
@@ -443,8 +497,15 @@ class Twinkly {
      * @return {Promise<{code: Number;}>}
      */
     async set_timer(time_now, time_on, time_off) {
-        const response = await this._post('timer', {'time_now': time_now, 'time_on': time_on, 'time_off': time_off}).catch(error => {throw Error(error)});
-        return {code: response['code']};
+        let resultError;
+        const response = await this._post('timer', {'time_now': time_now, 'time_on': time_on, 'time_off': time_off}).catch(error => {resultError = error;});        
+        
+        return new Promise((resolve, reject) => {
+            if (resultError)
+                reject(resultError)
+            else
+                resolve({code: response['code']});
+        });
     }
 
     /**
@@ -453,7 +514,16 @@ class Twinkly {
     async set_timer_str(data) {
         try {
             let json = JSON.parse(data);
-            return await this.set_timer(json.time_now, json.time_on, json.time_off).catch(error => {throw Error(error)});
+            
+            let resultError;
+            const response = await this.set_timer(json.time_now, json.time_on, json.time_off).catch(error => {resultError = error;});
+            
+            return new Promise((resolve, reject) => {
+                if (resultError)
+                    reject(resultError)
+                else
+                    resolve({code: response['code']});
+            });
         } catch (e) {
             throw Error(e.message);
         }
@@ -463,8 +533,15 @@ class Twinkly {
      * @return {Promise<{version: String; code: Number; }>} 
      */
     async get_firmware_version() {
-        const response = await this._get('fw/version').catch(error => {throw Error(error)});
-        return {version: response['version'], code: response['code']};
+        let resultError;
+        const response = await this._get('fw/version').catch(error => {resultError = error;});        
+        
+        return new Promise((resolve, reject) => {
+            if (resultError)
+                reject(resultError)
+            else
+                resolve({version: response['version'], code: response['code']});
+        });
     }
 
     /** 
@@ -475,22 +552,36 @@ class Twinkly {
      *                   code: Number; }>} 
      */
     async get_details() {
-        const response = await this._get('gestalt').catch(error => {throw Error(error)});
-        return {details: {product_name     : response['product_name'],     product_version : response['product_version'], hardware_version  : response['hardware_version'], 
+        let resultError;
+        const response = await this._get('gestalt').catch(error => {resultError = error;});        
+        
+        return new Promise((resolve, reject) => {
+            if (resultError)
+                reject(resultError)
+            else
+                resolve({details: {product_name     : response['product_name'],     product_version : response['product_version'], hardware_version  : response['hardware_version'], 
                           flash_size       : response['flash_size'],       led_type        : response['led_type'],        led_version       : response['led_version'], 
                           product_code     : response['product_code'],     device_name     : response['device_name'],     uptime            : response['uptime'], 
                           hw_id            : response['hw_id'],            mac             : response['mac'],             max_supported_led : response['max_supported_led'], 
                           base_leds_number : response['base_leds_number'], number_of_led   : response['number_of_led'],   led_profile       : response['led_profile'], 
                           frame_rate       : response['frame_rate'],       movie_capacity  : response['movie_capacity'],  copyright         : response['copyright']},
-                code : response['code']};
+                         code: response['code']});
+        });
     }
 
     /** 
      * @return {Promise<{mode: String; code: Number; }>} 
      */
     async get_mode() {
-        const response = await this._get('led/mode').catch(error => {throw Error(error)});
-        return {mode: response['mode'], code: response['code']};
+        let resultError;
+        const response = await this._get('led/mode').catch(error => {resultError = error;});        
+        
+        return new Promise((resolve, reject) => {
+            if (resultError)
+                reject(resultError)
+            else
+                resolve({mode: response['mode'], code: response['code']});
+        });
     }
 
     /**
@@ -498,16 +589,30 @@ class Twinkly {
      * @return {Promise<{code: Number; }>} 
      */
     async set_mode(mode) {
-        const response = await this._post('led/mode', {'mode': mode}).catch(error => {throw Error(error)});
-        return {code: response['code']};
+        let resultError;
+        const response = await this._post('led/mode', {'mode': mode}).catch(error => {resultError = error;});        
+        
+        return new Promise((resolve, reject) => {
+            if (resultError)
+                reject(resultError)
+            else
+                resolve({code: response['code']});
+        });
     }
 
     /** 
      * @return {Promise<{value: Number; enabled: String; code: Number; }>} 
      */
     async get_brightness() {
-        const response = await this._get('led/out/brightness').catch(error => {throw Error(error)});
-        return {value: response['value'], enabled: response['enabled'], code: response['code']};
+        let resultError;
+        const response = await this._get('led/out/brightness').catch(error => {resultError = error;});        
+        
+        return new Promise((resolve, reject) => {
+            if (resultError)
+                reject(resultError)
+            else
+                resolve({value: response['value'], enabled: response['enabled'], code: response['code']});
+        });
     }
 
     /**
@@ -515,22 +620,36 @@ class Twinkly {
      * @return {Promise<{code: Number; }>} 
      */
     async set_brightness(brightness) {
-        const response = await this._post('led/out/brightness', {value: brightness, mode: 'enabled', type: 'A'}).catch(error => {throw Error(error)});
-        return {code: response['code']};
+        let resultError;
+        const response = await this._post('led/out/brightness', {value: brightness, mode: 'enabled', type: 'A'}).catch(error => {resultError = error;});        
+        
+        return new Promise((resolve, reject) => {
+            if (resultError)
+                reject(resultError)
+            else
+                resolve({code: response['code']});
+        });
     }
 
     /** 
      * @return {Promise<{mqtt: {broker_host: String; broker_port: Number; client_id: String; encryption_key_set: Boolean; keep_alive_interval: Number; user: String; }; code: Number; }>} 
      */
     async get_mqtt() {
-        const response = await this._get('mqtt/config').catch(error => {throw Error(error)});
-        return {mqtt: {broker_host         : response['broker_host'], 
-                       broker_port         : response['broker_port'], 
-                       client_id           : response['client_id'], 
-                       encryption_key_set  : response['encryption_key_set'], 
-                       keep_alive_interval : response['keep_alive_interval'], 
-                       user                : response['user']},
-                code: response['code']};
+        let resultError;
+        const response = await this._get('mqtt/config').catch(error => {resultError = error;});        
+        
+        return new Promise((resolve, reject) => {
+            if (resultError)
+                reject(resultError)
+            else
+                resolve({mqtt: {broker_host         : response['broker_host'], 
+                                broker_port         : response['broker_port'], 
+                                client_id           : response['client_id'], 
+                                encryption_key_set  : response['encryption_key_set'], 
+                                keep_alive_interval : response['keep_alive_interval'], 
+                                user                : response['user']},
+                         code: response['code']});
+        });
     }
 
     /**
@@ -543,13 +662,20 @@ class Twinkly {
      * @return {Promise<{code: Number;}>}
      */
     async set_mqtt(broker_host, broker_port, client_id, encryption_key, keep_alive_interval, user) {
+        let resultError;
         const response = await this._post('mqtt/config', {broker_host         : broker_host, 
                                                           broker_port         : broker_port, 
                                                           client_id           : client_id, 
                                                           encryption_key      : encryption_key, 
                                                           keep_alive_interval : keep_alive_interval, 
-                                                          user                : user}).catch(error => {throw Error(error)});
-        return {code: response['code']};
+                                                          user                : user}).catch(error => {resultError = error;});        
+
+        return new Promise((resolve, reject) => {
+            if (resultError)
+                reject(resultError)
+            else
+                resolve({code: response['code']});
+        });
     }
 
     /**
@@ -558,8 +684,21 @@ class Twinkly {
     async set_mqtt_str(data) {
         try {
             let json = JSON.parse(data);
-            return await this.set_mqtt(json.broker_host, json.broker_port, json.client_id, json.encryption_key, json.keep_alive_interval, json.user)
-                              .catch(error => {throw Error(error)});
+            
+            let resultError;
+            const response = await this.set_mqtt(json.broker_host, 
+                                                 json.broker_port, 
+                                                 json.client_id, 
+                                                 json.encryption_key, 
+                                                 json.keep_alive_interval, 
+                                                 json.user).catch(error => {resultError = error;});
+            
+            return new Promise((resolve, reject) => {
+                if (resultError)
+                    reject(resultError)
+                else
+                    resolve({code: response['code']});
+            });
         } catch (e) {
             throw Error(e.message);
         }
@@ -570,16 +709,30 @@ class Twinkly {
      * @return {Promise<{code: Number;}>}
      */
     async upload_movie(movie) {
-        const response = await this._post('led/movie/full', movie, {'Content-Type': 'application/octet-stream', 'X-Auth-Token': this.token}).catch(error => {throw Error(error)});
-        return {code: response['code']};
+        let resultError;
+        const response = await this._post('led/movie/full', movie, {'Content-Type': 'application/octet-stream', 'X-Auth-Token': this.token}).catch(error => {resultError = error;});        
+        
+        return new Promise((resolve, reject) => {
+            if (resultError)
+                reject(resultError)
+            else
+                resolve({code: response['code']});
+        });
     }
 
     /** 
-     * @return {Promise<{response: {}; code: Number; }>} 
+     * @return {Promise<{response: void | {}; code: Number; }>} 
      */
     async get_movie_config() {
-        const response = await this._get('led/movie/config').catch(error => {throw Error(error)});
-        return {response, code: response['code']}; // TODO: 
+        let resultError;
+        const response = await this._get('led/movie/config').catch(error => {resultError = error;});        
+        
+        return new Promise((resolve, reject) => {
+            if (resultError)
+                reject(resultError)
+            else
+                resolve({response, code: response['code']}); // TODO: 
+        });
     }
 
     /**
@@ -589,8 +742,17 @@ class Twinkly {
      * @return {Promise<{code: Number;}>}
      */
     async set_movie_config(frame_delay, leds_number, frames_number) {
-        const response = await this._post('led/movie/config', {frame_delay: frame_delay, leds_number: leds_number, frames_number: frames_number}).catch(error => {throw Error(error)});
-        return {code: response['code']};
+        let resultError;
+        const response = await this._post('led/movie/config', {frame_delay   : frame_delay, 
+                                                               leds_number   : leds_number, 
+                                                               frames_number : frames_number}).catch(error => {resultError = error;});        
+        
+        return new Promise((resolve, reject) => {
+            if (resultError)
+                reject(resultError)
+            else
+                resolve({code: response['code']});
+        });
     }
 
     // async send_frame(frame) {
@@ -658,7 +820,7 @@ const
 
 function translateTwinklyCode(mode, path, code) {
     if (code != HTTPCodes.ok) 
-        return `<${mode} /${path}> - ${code} (${HTTPCodes_TXT[code]})`;
+        return `[${mode}.${path}] ${code} (${HTTPCodes_TXT[code]})`;
 }
 
 init();
@@ -826,4 +988,3 @@ onStop(function (callback) {
 
     callback();
 }, 500);
-
