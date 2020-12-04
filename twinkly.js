@@ -27,8 +27,8 @@
 const PATH_ID = 'javascript.0.MyDevices.Twinkly.';
 
 const devices = {
-    Weihnachtsbaum : {
-        name           : 'Weihnachtsbaum',               // Name für ioBroker
+    Weihnachtsbaum : {                                   // State-Name in ioBroker
+        name           : 'Weihnachtsbaum',               // Name für ioBroker (Falls nicht hinterlegt wird der State-Name verwendet)
         ipAdresse      : '192.168.178.53',               // IP-Adresse von der Twinkly-Lichterkette
         connectedState : 'ping.0.Twinkly_Weihnachtsbaum' // State mit true/false der den aktuellen Status der Lichterkette überwacht (bspw. ping, tr-064)
     }
@@ -151,7 +151,7 @@ function init() {
                 });
 
                 // Jede Minute aktuelle Werte abfragen
-                schedule('* * * * *', async function() {
+                getDataInterval = setInterval(async function() {
                     /*******************************************************************************
                      * Daten abfragen
                      *******************************************************************************/
@@ -172,7 +172,7 @@ function init() {
                             setState(PATH_ID + device + '.mode', mode, true);
                             setState(PATH_ID + device + '.on',   mode != MODES.off, true);
                         })
-                        .catch(error => {console.error(`[${device}.on] ${error}`)});
+                        .catch(error => {console.error(`[${device}.mode] ${error}`)});
                             
                         await devices[device].connect.get_brightness()
                         .then(({value}) => {setState(PATH_ID + device + '.bri', value, true);})
@@ -199,8 +199,8 @@ function init() {
                         .catch(error => {console.error(`[${device}.firmware] ${error}`)});
                     }
                     /*******************************************************************************/
-                });
-            }, 2000);
+                }, 60_000);
+            }, 2_000);
         }
     }
 }
@@ -260,7 +260,7 @@ class Twinkly {
                 doPostRequest(this.base() + '/' + path, data, {headers: headers})
                 .then(({response, body}) => {
                     try {
-                        let checkTwinklyCode = translateTwinklyCode('POST', path, body.code);
+                        let checkTwinklyCode = translateTwinklyCode(this.name, 'POST', path, body.code);
                         if (checkTwinklyCode)
                             console.warn(`${checkTwinklyCode}, Data: ${JSON.stringify(data)}, Headers: ${JSON.stringify(headers)}, Body: ${JSON.stringify(body)}`);
                         
@@ -293,7 +293,7 @@ class Twinkly {
                 doGetRequest(this.base() + '/' + path, {headers: this.headers})
                 .then(({response, body}) => {
                     try {
-                        let checkTwinklyCode = translateTwinklyCode('GET', path, body.code);
+                        let checkTwinklyCode = translateTwinklyCode(this.name, 'GET', path, body.code);
                         if (checkTwinklyCode)
                             console.warn(`${checkTwinklyCode}, Headers: ${JSON.stringify(this.headers)}, Body: ${JSON.stringify(body)}`);
                         
@@ -330,7 +330,7 @@ class Twinkly {
                     resolve(TWINKLY_OBJ.token);
             });
         } else
-            console.debug(`[${TWINKLY_OBJ.name}.ensure_token] Authentication token still valid`);
+            console.debug(`[${TWINKLY_OBJ.name}.ensure_token] Authentication token still valid (${new Date(TWINKLY_OBJ.expires).toLocaleString()})`);
     }
 
     /**
@@ -344,13 +344,13 @@ class Twinkly {
             doPostRequest(TWINKLY_OBJ.base() + '/login', {'challenge': 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8='}, null)
             .then(({response, body}) => {
                 try {
-                    let checkTwinklyCode = translateTwinklyCode('POST', 'login', body.code);
+                    let checkTwinklyCode = translateTwinklyCode(TWINKLY_OBJ.name, 'POST', 'login', body.code);
                     if (checkTwinklyCode)
                         console.warn(`${checkTwinklyCode}, Body: ${JSON.stringify(body)}`);
 
                     TWINKLY_OBJ.token                   = body['authentication_token'];
                     TWINKLY_OBJ.headers['X-Auth-Token'] = TWINKLY_OBJ.token;
-                    TWINKLY_OBJ.expires                 = Date.now() + body['authentication_token_expires_in'];
+                    TWINKLY_OBJ.expires                 = Date.now() + (body['authentication_token_expires_in'] * 1000);
                     TWINKLY_OBJ.challengeResponse       = body['challenge-response'];
 
                     resolve({authentication_token            : body['authentication_token'], 
@@ -818,11 +818,18 @@ const
         1105 : 'Invalid argument key'};
 
 
-function translateTwinklyCode(mode, path, code) {
+/**
+* @param {string} name
+* @param {string} mode
+* @param {string} path
+* @param {number} code
+*/
+function translateTwinklyCode(name, mode, path, code) {
     if (code != HTTPCodes.ok) 
-        return `[${mode}.${path}] ${code} (${HTTPCodes_TXT[code]})`;
+        return `[${name}.${mode}.${path}] ${code} (${HTTPCodes_TXT[code]})`;
 }
 
+let getDataInterval;
 init();
 
 
@@ -982,6 +989,12 @@ function isState(strStatePath, strict) {
 
 // Alle Verbindungen abmelden...
 onStop(function (callback) {
+    // Interval abbrechen
+    if (getDataInterval) {
+        clearInterval(getDataInterval);
+        getDataInterval = null;
+    }
+
     for (let device of Object.keys(devices))
         devices[device].connect.logout()
         .catch(error => {console.error(`[onStop] ${error}`)});
