@@ -313,13 +313,15 @@ class Twinkly {
             doPostRequest(this.base() + '/' + path, data, {headers: headers})
             .then(({response, body}) => {
                 try {
-                    let checkTwinklyCode = translateTwinklyCode(this.name, 'POST', path, body.code);
-                    if (checkTwinklyCode)
-                        console.warn(`${checkTwinklyCode}, Data: ${JSON.stringify(data)}, Headers: ${JSON.stringify(headers)}, Body: ${JSON.stringify(body)}`);
-                    
+                    if (body && typeof body === 'object') {
+                        let checkTwinklyCode = translateTwinklyCode(this.name, 'POST', path, body.code);
+                        if (checkTwinklyCode)
+                            console.warn(`${checkTwinklyCode}, Data: ${JSON.stringify(data)}, Headers: ${JSON.stringify(headers)}, Body: ${JSON.stringify(body)}`);
+                    }
+
                     resolve(body);
                 } catch (e) {
-                    reject(`${e.name}: ${e.message}, Data: ${JSON.stringify(data)}, Headers: ${JSON.stringify(headers)}, Body: ${JSON.stringify(body)}`);
+                    reject(`${e.name}: ${e.message}`);
                 }
             })
             .catch(error => {
@@ -329,9 +331,9 @@ class Twinkly {
     }
 
     /**
-    * @param {string} path
-    * @return {Promise<{}>}
-    */
+     * @param {string} path
+     * @return {Promise<{}>}
+     */
     async _get(path) {
         console.debug(`[${this.name}._get] <${path}>`);
 
@@ -377,9 +379,11 @@ class Twinkly {
             doGetRequest(this.base() + '/' + path, {headers: this.headers})
             .then(({response, body}) => {
                 try {
-                    let checkTwinklyCode = translateTwinklyCode(this.name, 'GET', path, body.code);
-                    if (checkTwinklyCode)
-                        console.warn(`${checkTwinklyCode}, Headers: ${JSON.stringify(this.headers)}, Body: ${JSON.stringify(body)}`);
+                    if (body && typeof body === 'object') {
+                        let checkTwinklyCode = translateTwinklyCode(this.name, 'GET', path, body.code);
+                        if (checkTwinklyCode)
+                            console.warn(`${checkTwinklyCode}, Headers: ${JSON.stringify(this.headers)}, Body: ${JSON.stringify(body)}`);
+                    }
                     
                     resolve(body);
                 } catch (e) {
@@ -430,9 +434,11 @@ class Twinkly {
             doPostRequest(TWINKLY_OBJ.base() + '/login', {'challenge': 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8='}, null)
             .then(({response, body}) => {
                 try {
-                    let checkTwinklyCode = translateTwinklyCode(TWINKLY_OBJ.name, 'POST', 'login', body.code);
-                    if (checkTwinklyCode)
-                        console.warn(`${checkTwinklyCode}, Body: ${JSON.stringify(body)}`);
+                    if (body && typeof body === 'object') {
+                        let checkTwinklyCode = translateTwinklyCode(TWINKLY_OBJ.name, 'POST', 'login', body.code);
+                        if (checkTwinklyCode)
+                            console.warn(`${checkTwinklyCode}, Body: ${JSON.stringify(body)}`);
+                    }
 
                     TWINKLY_OBJ.token                   = body['authentication_token'];
                     TWINKLY_OBJ.headers['X-Auth-Token'] = TWINKLY_OBJ.token;
@@ -444,7 +450,7 @@ class Twinkly {
                              'challenge-response'            : body['challenge-response'], 
                              code                            : body['code']});
                 } catch (e) {
-                    reject(`${e.name}: ${e.message}, Body: ${JSON.stringify(body)}`);
+                        reject(`${e.name}: ${e.message}, Body: ${JSON.stringify(body)}`);
                 }
             })
             .catch(error => {
