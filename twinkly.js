@@ -267,7 +267,7 @@ class Twinkly {
     async _post(path, data, headers = {}) {
         if (Object.keys(headers).length == 0) headers = this.headers;
 
-        logs.debug(`[${this.name}._post] <${path}>, ${JSON.stringify(data)}, ${JSON.stringify(headers)}`);
+        console.debug(`[${this.name}._post] <${path}>, ${JSON.stringify(data)}, ${JSON.stringify(headers)}`);
 
         let result, resultError;
         await this.ensure_token(false).catch(error => {resultError = error;});
