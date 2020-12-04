@@ -26,6 +26,8 @@
  *******************************************************************************/
 const PATH_ID = 'javascript.0.MyDevices.Twinkly.';
 
+const POLLING_IN_SEK = 60;
+
 const devices = {
     Weihnachtsbaum : {                                   // State-Name in ioBroker
         name           : 'Weihnachtsbaum',               // Name für ioBroker (Falls nicht hinterlegt wird der State-Name verwendet)
@@ -44,6 +46,10 @@ function init() {
             deviceName = device;
 
         devices[device].connect = new Twinkly(deviceName, devices[device].ipAdresse);
+
+        // Doppelte Ereignisse verhindern...
+        devices[device].fetchActive = false;
+        devices[device].lastAction  = '';
 
         // Soll der Ping-Adapter geprüft werden?
         devices[device].checkConnected = !isLikeEmpty(devices[device].connectedState) && isState(devices[device].connectedState, true);
@@ -113,6 +119,11 @@ function init() {
 
                     // Nur ausführen, wenn Gerät verbunden ist!
                     if (devices[device].checkConnected && !getState(devices[device].connectedState).val) return;
+                    
+                    // Doppelte Ereignisse verhindern...
+                    let action = 'set:' + command + ':' + obj.state.val;
+                    if (devices[device].lastAction == action) return;
+                    devices[device].lastAction = action;
 
                     /*******************************************************************************
                      * Daten ändern
@@ -167,6 +178,10 @@ function init() {
                             if (!connected) continue;
                         }
 
+                        if (devices[device].fetchActive) continue;
+                        // Fetch gestartet und Flag setzen
+                        devices[device].fetchActive = true;
+
                         await devices[device].connect.get_mode()
                         .then(({mode}) => {
                             setState(PATH_ID + device + '.mode', mode, true);
@@ -197,9 +212,12 @@ function init() {
                         await devices[device].connect.get_firmware_version()
                         .then(({version}) => {setState(PATH_ID + device + '.firmware', version, true);})
                         .catch(error => {console.error(`[${device}.firmware] ${error}`)});
+
+                        // Fetch abgeschlossen und Flag zurücksetzen
+                        devices[device].fetchActive = false;
                     }
                     /*******************************************************************************/
-                }, 60_000);
+                }, POLLING_IN_SEK * 1_000);
             }, 2_000);
         }
     }
@@ -241,38 +259,72 @@ class Twinkly {
     }
 
     /**
-    * @param {string} path
-    * @param {any} data
-    * @return {Promise<{}>} 
-    */
+     * @param {string} path
+     * @param {any} data
+     * @param {{}} headers
+     * @return {Promise<{}>}
+     */
     async _post(path, data, headers = {}) {
-        console.debug(`[${this.name}._post] <${path}> ${JSON.stringify(data)}`);
-
         if (Object.keys(headers).length == 0) headers = this.headers;
 
-        let resultError;
-        await this.ensure_token().catch(error => {resultError = error;});
-        
+        logs.debug(`[${this.name}._post] <${path}>, ${JSON.stringify(data)}, ${JSON.stringify(headers)}`);
+
+        let result, resultError;
+        await this.ensure_token(false).catch(error => {resultError = error;});
+
+        if (!resultError) {        
+            // POST ausführen...
+            await this._doPOST(path, data, headers).then(response => {result = response;}).catch(error => {resultError = error;});
+
+            if (resultError && String(resultError).includes('Invalid Token')) {
+                resultError = null;
+
+                // Token erneuern
+                await this.ensure_token(true).catch(error => {resultError = error;});
+
+                // POST erneut ausführen...
+                if (!resultError) {
+                    await this._doPOST(path, data, headers).then(response => {result = response;}).catch(error => {resultError = error;});
+                    
+                    // Wenn wieder fehlerhaft, dann Pech gehabt. Token wird gelöscht...
+                    if (resultError && String(resultError).includes('Invalid Token'))
+                        this.token = '';
+                }
+            }
+        }
+
         return new Promise((resolve, reject) => {
             if (resultError)
                 reject(resultError)
             else {
-                doPostRequest(this.base() + '/' + path, data, {headers: headers})
-                .then(({response, body}) => {
-                    try {
-                        let checkTwinklyCode = translateTwinklyCode(this.name, 'POST', path, body.code);
-                        if (checkTwinklyCode)
-                            console.warn(`${checkTwinklyCode}, Data: ${JSON.stringify(data)}, Headers: ${JSON.stringify(headers)}, Body: ${JSON.stringify(body)}`);
-                        
-                        resolve(body);
-                    } catch (e) {
-                        reject(e.name + ': ' + e.message);
-                    }
-                })
-                .catch(error => {
-                    reject(error);
-                });
+                resolve(result);
             }
+        });
+    }
+
+    /**
+     * @param {string} path
+     * @param {any} data
+     * @param {{}} headers
+     * @return {Promise<{}>}
+     */
+    async _doPOST(path, data, headers) {
+        return new Promise((resolve, reject) => {
+            doPostRequest(this.base() + '/' + path, data, {headers: headers})
+            .then(({response, body}) => {
+                try {
+                    let checkTwinklyCode = translateTwinklyCode(this.name, 'POST', path, body.code);
+                    if (checkTwinklyCode)
+                        console.warn(`${checkTwinklyCode}, Data: ${JSON.stringify(data)}, Headers: ${JSON.stringify(headers)}, Body: ${JSON.stringify(body)}`);
+                    
+                    resolve(body);
+                } catch (e) {
+                    reject(`${e.name}: ${e.message}, Data: ${JSON.stringify(data)}, Headers: ${JSON.stringify(headers)}, Body: ${JSON.stringify(body)}`);
+                }
+            })
+            .catch(error => {
+                reject(error);
+            });
         });
     }
 
@@ -283,39 +335,72 @@ class Twinkly {
     async _get(path) {
         console.debug(`[${this.name}._get] <${path}>`);
 
-        let resultError;
-        await this.ensure_token().catch(error => {resultError = error;});
+        let result, resultError;
+        await this.ensure_token(false).catch(error => {resultError = error;});
+
+        if (!resultError) {        
+            // GET ausführen...
+            await this._doGET(path).then(response => {result = response;}).catch(error => {resultError = error;});
+
+            if (resultError && String(resultError).includes('Invalid Token')) {
+                resultError = null;
+
+                // Token erneuern
+                await this.ensure_token(true).catch(error => {resultError = error;});
+
+                // GET erneut ausführen...
+                if (!resultError) {
+                    await this._doGET(path).then(response => {result = response;}).catch(error => {resultError = error;});
+
+                    // Wenn wieder fehlerhaft, dann Pech gehabt. Token wird gelöscht...
+                    if (resultError && String(resultError).includes('Invalid Token'))
+                        this.token = '';
+                }
+            }
+        }
 
         return new Promise((resolve, reject) => {
             if (resultError)
                 reject(resultError)
             else {
-                doGetRequest(this.base() + '/' + path, {headers: this.headers})
-                .then(({response, body}) => {
-                    try {
-                        let checkTwinklyCode = translateTwinklyCode(this.name, 'GET', path, body.code);
-                        if (checkTwinklyCode)
-                            console.warn(`${checkTwinklyCode}, Headers: ${JSON.stringify(this.headers)}, Body: ${JSON.stringify(body)}`);
-                        
-                        resolve(body);
-                    } catch (e) {
-                        reject(e.name + ': ' + e.message);
-                    }
-                })
-                .catch(error => {
-                    reject(error);
-                });
+                resolve(result);
             }
         });
     }
     
-    /** Token prüfen ob er bereits abgelaufen ist.
+    /**
+     * @param {string} path
+     * @return {Promise<{}>}
+     */
+    async _doGET(path) {
+        return new Promise((resolve, reject) => {
+            doGetRequest(this.base() + '/' + path, {headers: this.headers})
+            .then(({response, body}) => {
+                try {
+                    let checkTwinklyCode = translateTwinklyCode(this.name, 'GET', path, body.code);
+                    if (checkTwinklyCode)
+                        console.warn(`${checkTwinklyCode}, Headers: ${JSON.stringify(this.headers)}, Body: ${JSON.stringify(body)}`);
+                    
+                    resolve(body);
+                } catch (e) {
+                    reject(`${e.name}: ${e.message}`);
+                }
+            })
+            .catch(error => {
+                reject(error);
+            });
+        });
+    }
+    
+    /**
+     * Token prüfen ob er bereits abgelaufen ist.
+     * @param {boolean} force
      * @return {Promise<String>}
      */
-    async ensure_token() {
+    async ensure_token(force) {
         const TWINKLY_OBJ = this;
 
-        if (TWINKLY_OBJ.token == '' || TWINKLY_OBJ.expires == null || TWINKLY_OBJ.expires <= Date.now()) {
+        if (force || (TWINKLY_OBJ.token == '' || TWINKLY_OBJ.expires == null || TWINKLY_OBJ.expires <= Date.now())) {
             console.debug(`[${TWINKLY_OBJ.name}.ensure_token] Authentication token expired, will refresh`);
 
             let resultError;
@@ -329,8 +414,9 @@ class Twinkly {
                 else
                     resolve(TWINKLY_OBJ.token);
             });
-        } else
+        } else {
             console.debug(`[${TWINKLY_OBJ.name}.ensure_token] Authentication token still valid (${new Date(TWINKLY_OBJ.expires).toLocaleString()})`);
+        }
     }
 
     /**
@@ -358,11 +444,11 @@ class Twinkly {
                              'challenge-response'            : body['challenge-response'], 
                              code                            : body['code']});
                 } catch (e) {
-                    reject(e.name + ': ' + e.message);
+                    reject(`${e.name}: ${e.message}, Body: ${JSON.stringify(body)}`);
                 }
             })
             .catch(error => {
-                reject(error);
+            	reject(error);
             });
         });
     }
@@ -788,18 +874,20 @@ class Twinkly {
 
 const 
     MODES = {
-        rt     : 'rt', 
-        on     : 'movie', 
-        off    : 'off', 
-        demo   : 'demo', 
-        effect : 'effect'},
+        rt       : 'rt', 
+        on       : 'movie', 
+        off      : 'off',
+        playlist : 'playlist',
+        demo     : 'demo', 
+        effect   : 'effect'},
 
     MODES_TXT = {
-        rt     : 'Real Time', 
-        movie  : 'Eingeschaltet', 
-        off    : 'Ausgeschaltet', 
-        demo   : 'Demo', 
-        effect : 'Effect'},
+        rt       : 'Real Time', 
+        movie    : 'Eingeschaltet', 
+        off      : 'Ausgeschaltet', 
+        playlist : 'Playlist',
+        demo     : 'Demo', 
+        effect   : 'Effect'},
 
     HTTPCodes = {
         ok         : 1000,
@@ -888,7 +976,7 @@ function httpRequest(url, body, method, addOptions = null) {
         console.debug(`[httpRequest.${method}] ${JSON.stringify(options)}`);
         request(options, function (error, response, body) {
             const err = error ? error : (response && response.statusCode !== 200 ? 'HTTP Error ' + response.statusCode : null)
-            if (err) reject(err);
+            if (err) reject(err + ', ' + JSON.stringify(body));
 
             resolve({response: response, body: body});
         }).on("error", (e) => {
@@ -986,8 +1074,7 @@ function isState(strStatePath, strict) {
 }
 /*******************************************************************************/
 
-
-// Alle Verbindungen abmelden...
+// Nach Skript-Ende...
 onStop(function (callback) {
     // Interval abbrechen
     if (getDataInterval) {
@@ -995,9 +1082,11 @@ onStop(function (callback) {
         getDataInterval = null;
     }
 
+    // Alle Verbindungen abmelden...
     for (let device of Object.keys(devices))
         devices[device].connect.logout()
-        .catch(error => {console.error(`[onStop] ${error}`)});
+        .catch(error => {console.error(`[onStop.${devices[device].connect.name}] ${error}`)});
 
     callback();
 }, 500);
+
