@@ -28,6 +28,8 @@ const PATH_ID = 'javascript.0.MyDevices.Twinkly.';
 
 const POLLING_IN_SEK = 60;
 
+const EXTENDED_LOGGING = true;
+
 const devices = {
     Weihnachtsbaum : {                                   // State-Name in ioBroker
         name           : 'Weihnachtsbaum',               // Name für ioBroker (Falls nicht hinterlegt wird der State-Name verwendet)
@@ -267,7 +269,7 @@ class Twinkly {
     async _post(path, data, headers = {}) {
         if (Object.keys(headers).length == 0) headers = this.headers;
 
-        console.debug(`[${this.name}._post] <${path}>, ${JSON.stringify(data)}, ${JSON.stringify(headers)}`);
+        logDebug(`[${this.name}._post] <${path}>, ${JSON.stringify(data)}, ${JSON.stringify(headers)}`);
 
         let result, resultError;
         await this.ensure_token(false).catch(error => {resultError = error;});
@@ -335,7 +337,7 @@ class Twinkly {
      * @return {Promise<{}>}
      */
     async _get(path) {
-        console.debug(`[${this.name}._get] <${path}>`);
+        logDebug(`[${this.name}._get] <${path}>`);
 
         let result, resultError;
         await this.ensure_token(false).catch(error => {resultError = error;});
@@ -364,9 +366,8 @@ class Twinkly {
         return new Promise((resolve, reject) => {
             if (resultError)
                 reject(resultError)
-            else {
+            else
                 resolve(result);
-            }
         });
     }
     
@@ -405,7 +406,7 @@ class Twinkly {
         const TWINKLY_OBJ = this;
 
         if (force || (TWINKLY_OBJ.token == '' || TWINKLY_OBJ.expires == null || TWINKLY_OBJ.expires <= Date.now())) {
-            console.debug(`[${TWINKLY_OBJ.name}.ensure_token] Authentication token expired, will refresh`);
+            logDebug(`[${TWINKLY_OBJ.name}.ensure_token] Authentication token expired, will refresh`);
 
             let resultError;
             await TWINKLY_OBJ.login().catch(error => {resultError = error;});
@@ -419,7 +420,7 @@ class Twinkly {
                     resolve(TWINKLY_OBJ.token);
             });
         } else {
-            console.debug(`[${TWINKLY_OBJ.name}.ensure_token] Authentication token still valid (${new Date(TWINKLY_OBJ.expires).toLocaleString()})`);
+            logDebug(`[${TWINKLY_OBJ.name}.ensure_token] Authentication token still valid (${new Date(TWINKLY_OBJ.expires).toLocaleString()})`);
         }
     }
 
@@ -434,21 +435,24 @@ class Twinkly {
             doPostRequest(TWINKLY_OBJ.base() + '/login', {'challenge': 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8='}, null)
             .then(({response, body}) => {
                 try {
-                    if (body && typeof body === 'object') {
-                        let checkTwinklyCode = translateTwinklyCode(TWINKLY_OBJ.name, 'POST', 'login', body.code);
-                        if (checkTwinklyCode)
-                            console.warn(`${checkTwinklyCode}, Body: ${JSON.stringify(body)}`);
+                    let checkTwinklyCode;
+                    if (body && typeof body === 'object')
+                        checkTwinklyCode = translateTwinklyCode(TWINKLY_OBJ.name, 'POST', 'login', body.code);
+
+                    if (checkTwinklyCode) {
+                        reject(checkTwinklyCode);
                     }
+                    else {
+                        TWINKLY_OBJ.token                   = body['authentication_token'];
+                        TWINKLY_OBJ.headers['X-Auth-Token'] = TWINKLY_OBJ.token;
+                        TWINKLY_OBJ.expires                 = Date.now() + (body['authentication_token_expires_in'] * 1000);
+                        TWINKLY_OBJ.challengeResponse       = body['challenge-response'];
 
-                    TWINKLY_OBJ.token                   = body['authentication_token'];
-                    TWINKLY_OBJ.headers['X-Auth-Token'] = TWINKLY_OBJ.token;
-                    TWINKLY_OBJ.expires                 = Date.now() + (body['authentication_token_expires_in'] * 1000);
-                    TWINKLY_OBJ.challengeResponse       = body['challenge-response'];
-
-                    resolve({authentication_token            : body['authentication_token'], 
-                             authentication_token_expires_in : body['authentication_token_expires_in'], 
-                             'challenge-response'            : body['challenge-response'], 
-                             code                            : body['code']});
+                        resolve({authentication_token            : body['authentication_token'], 
+                                 authentication_token_expires_in : body['authentication_token_expires_in'], 
+                                 'challenge-response'            : body['challenge-response'], 
+                                 code                            : body['code']});
+                    }
                 } catch (e) {
                         reject(`${e.name}: ${e.message}, Body: ${JSON.stringify(body)}`);
                 }
@@ -724,7 +728,12 @@ class Twinkly {
     }
 
     /** 
-     * @return {Promise<{mqtt: {broker_host: String; broker_port: Number; client_id: String; encryption_key_set: Boolean; keep_alive_interval: Number; user: String; }; code: Number; }>} 
+     * @return {Promise<{mqtt: {broker_host: String; 
+     *                          broker_port: Number; 
+     *                          client_id: String; 
+     *                          user: String;
+     *                          keep_alive_interval: Number; 
+     *                          encryption_key_set: Boolean; }; code: Number; }>} 
      */
     async get_mqtt() {
         let resultError;
@@ -901,7 +910,8 @@ const
         error      : 1102,
         errorValue : 1103,
         errorJSON  : 1104,
-        invalidKey : 1105},
+        invalidKey : 1105,
+        errorLogin : 1106},
 
     HTTPCodes_TXT = {
         1000 : 'OK',
@@ -909,7 +919,8 @@ const
         1102 : 'Error',
         1103 : 'Error - value too long',
         1104 : 'Error - malformed JSON on input',
-        1105 : 'Invalid argument key'};
+        1105 : 'Invalid argument key',
+        1106 : 'Error - Login'};
 
 
 /**
@@ -921,6 +932,16 @@ const
 function translateTwinklyCode(name, mode, path, code) {
     if (code != HTTPCodes.ok) 
         return `[${name}.${mode}.${path}] ${code} (${HTTPCodes_TXT[code]})`;
+}
+
+/**
+* @param {string} message
+*/
+function logDebug(message) {
+    if (EXTENDED_LOGGING) 
+        logs.log(message)
+    else
+        logs.debug(message);
 }
 
 let getDataInterval;
@@ -979,7 +1000,7 @@ function httpRequest(url, body, method, addOptions = null) {
                     options[option] = addOptions[option]
         }
     
-        console.debug(`[httpRequest.${method}] ${JSON.stringify(options)}`);
+        logDebug(`[httpRequest.${method}] ${JSON.stringify(options)}`);
         request(options, function (error, response, body) {
             const err = error ? error : (response && response.statusCode !== 200 ? 'HTTP Error ' + response.statusCode : null)
             if (err) reject(err + ', ' + JSON.stringify(body));
@@ -1000,8 +1021,8 @@ function doGetRequest(url, addOptions = null) {
     return new Promise((resolve, reject) => {
         httpRequest(url, null, 'GET', addOptions)
         .then(({response, body}) => {
-            if (response) console.debug('[doGetRequest] response: ' + JSON.stringify(response));
-            if (body)     console.debug('[doGetRequest] body: '     + JSON.stringify(body));
+            if (response) logDebug('[doGetRequest] response: ' + JSON.stringify(response));
+            if (body)     clogDebug('[doGetRequest] body: '     + JSON.stringify(body));
 
             resolve({response: response, body: body});
         })
@@ -1021,8 +1042,8 @@ function doPostRequest(url, body, addOptions = null) {
     return new Promise((resolve, reject) => {
         httpRequest(url, body, 'POST', addOptions)
         .then(({response, body}) => {
-            if (response) console.debug('[doPostRequest] response: ' + JSON.stringify(response));
-            if (body)     console.debug('[doPostRequest] body: '     + JSON.stringify(body));
+            if (response) logDebug('[doPostRequest] response: ' + JSON.stringify(response));
+            if (body)     logDebug('[doPostRequest] body: '     + JSON.stringify(body));
 
             resolve({response: response, body: body});
         })
