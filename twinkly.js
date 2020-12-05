@@ -28,7 +28,7 @@ const PATH_ID = 'javascript.0.MyDevices.Twinkly.';
 
 const POLLING_IN_SEK = 60;
 
-const EXTENDED_LOGGING = true;
+const EXTENDED_LOGGING = false;
 
 const devices = {
     Weihnachtsbaum : {                                   // State-Name in ioBroker
