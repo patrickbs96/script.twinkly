@@ -939,9 +939,9 @@ function translateTwinklyCode(name, mode, path, code) {
 */
 function logDebug(message) {
     if (EXTENDED_LOGGING) 
-        logs.log(message)
+        console.log(message)
     else
-        logs.debug(message);
+        console.debug(message);
 }
 
 let getDataInterval;
@@ -1022,7 +1022,7 @@ function doGetRequest(url, addOptions = null) {
         httpRequest(url, null, 'GET', addOptions)
         .then(({response, body}) => {
             if (response) logDebug('[doGetRequest] response: ' + JSON.stringify(response));
-            if (body)     clogDebug('[doGetRequest] body: '     + JSON.stringify(body));
+            if (body)     logDebug('[doGetRequest] body: '     + JSON.stringify(body));
 
             resolve({response: response, body: body});
         })
