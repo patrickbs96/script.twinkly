@@ -17,6 +17,7 @@
  * ----------------------------------------------------
  * Change Log:
  *  1.0   patrickbs96   * Initial release
+ *  1.1   patrickbs96   * Requests auf curl umgestellt, da diese auch mit der 1. Generation funktionieren
  *******************************************************************************/
 
 
@@ -25,9 +26,9 @@
  * Settings
  *******************************************************************************/
 const PATH_ID          = 'javascript.0.MyDevices.Twinkly.'; // Pfad für die Datenpunkte
-const POLLING_IN_SEK   = 60;                                // Wie oft sollen die Daten abgefragt werden
-const EXTENDED_LOGGING = false;                             // Mehr Informationen loggen
-const USE_CURL_INSTEAD = false;                             // Sollen die Befehle als curl anstelle vom Request versendet werden.
+const POLLING_IN_SEK   = 30;                                // Wie oft sollen die Daten abgefragt werden
+const EXTENDED_LOGGING = true;                             // Mehr Informationen loggen
+const USE_CURL_INSTEAD = true;                             // Sollen die Befehle als curl anstelle vom Request versendet werden.
 
 const devices = {
     Weihnachtsbaum : {                                   // State-Name in ioBroker
@@ -188,31 +189,31 @@ function init() {
                             setState(PATH_ID + device + '.mode', mode, true);
                             setState(PATH_ID + device + '.on',   mode != MODES.off, true);
                         })
-                        .catch(error => {console.error(`[${device}.mode] ${error}`)});
-                            
+                        .catch(error => {console.error(`[${device}.mode] ${error}`);});
+
                         await devices[device].connect.get_brightness()
                         .then(({value}) => {setState(PATH_ID + device + '.bri', value, true);})
-                        .catch(error => {console.error(`[${device}.bri] ${error}`)});
+                        .catch(error => {console.error(`[${device}.bri] ${error}`);});
 
                         await devices[device].connect.get_name()
                         .then(({name}) => {setState(PATH_ID + device + '.name', name, true);})
-                        .catch(error => {console.error(`[${device}.name] ${error}`)});
+                        .catch(error => {console.error(`[${device}.name] ${error}`);});
 
                         await devices[device].connect.get_mqtt()
                         .then(({mqtt}) => {setState(PATH_ID + device + '.mqtt', JSON.stringify(mqtt), true);})
-                        .catch(error => {console.error(`[${device}.mqtt] ${error}`)});
+                        .catch(error => {console.error(`[${device}.mqtt] ${error}`);});
 
                         await devices[device].connect.get_timer()
                         .then(({timer}) => {setState(PATH_ID + device + '.timer', JSON.stringify(timer), true);})
-                        .catch(error => {console.error(`[${device}.timer] ${error}`)});
+                        .catch(error => {console.error(`[${device}.timer] ${error}`);});
 
                         await devices[device].connect.get_details()
                         .then(({details}) => {setState(PATH_ID + device + '.details', JSON.stringify(details), true);})
-                        .catch(error => {console.error(`[${device}.details] ${error}`)});
+                        .catch(error => {console.error(`[${device}.details] ${error}`);});
 
                         await devices[device].connect.get_firmware_version()
                         .then(({version}) => {setState(PATH_ID + device + '.firmware', version, true);})
-                        .catch(error => {console.error(`[${device}.firmware] ${error}`)});
+                        .catch(error => {console.error(`[${device}.firmware] ${error}`);});
 
                         // Fetch abgeschlossen und Flag zurücksetzen
                         devices[device].fetchActive = false;
@@ -311,17 +312,17 @@ class Twinkly {
      */
     async _doPOST(path, data, headers) {
         return new Promise((resolve, reject) => {
-            doPostRequest(this.base() + '/' + path, data, {headers: headers})
-            .then(({response, body}) => {
+            sendPostHTTP(this.base() + '/' + path, data, headers)
+            .then(response => {
                 try {
                     let checkTwinklyCode;
-                    if (body && typeof body === 'object')
-                        checkTwinklyCode = translateTwinklyCode(this.name, 'POST', path, body.code);
+                    if (response && typeof response === 'object')
+                        checkTwinklyCode = translateTwinklyCode(this.name, 'POST', path, response['code']);
 
                     if (checkTwinklyCode)
                         reject(`${checkTwinklyCode}, Data: ${JSON.stringify(data)}, Headers: ${JSON.stringify(headers)}`)
                     else
-                        resolve(body);
+                        resolve(response);
                 } catch (e) {
                     reject(`${e.name}: ${e.message}`);
                 }
@@ -377,17 +378,17 @@ class Twinkly {
      */
     async _doGET(path) {
         return new Promise((resolve, reject) => {
-            doGetRequest(this.base() + '/' + path, {headers: this.headers})
-            .then(({response, body}) => {
+            sendGetHTTP(this.base() + '/' + path, this.headers)
+            .then(response => {
                 try {
                     let checkTwinklyCode;
-                    if (body && typeof body === 'object')
-                        checkTwinklyCode = translateTwinklyCode(this.name, 'GET', path, body.code);
+                    if (response && typeof response === 'object')
+                        checkTwinklyCode = translateTwinklyCode(this.name, 'GET', path, response['code']);
                 
                     if (checkTwinklyCode)
                         reject(`${checkTwinklyCode}, Headers: ${JSON.stringify(this.headers)}`)
                     else
-                        resolve(body);
+                        resolve(response);
                 } catch (e) {
                     reject(`${e.name}: ${e.message}`);
                 }
@@ -433,28 +434,28 @@ class Twinkly {
 
         this.token = '';
         return new Promise((resolve, reject) => {
-            doPostRequest(TWINKLY_OBJ.base() + '/login', {'challenge': 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8='}, null)
-            .then(({response, body}) => {
+            sendPostHTTP(TWINKLY_OBJ.base() + '/login', {'challenge': 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8='})
+            .then(response => {
                 try {
                     let checkTwinklyCode;
-                    if (body && typeof body === 'object')
-                        checkTwinklyCode = translateTwinklyCode(TWINKLY_OBJ.name, 'POST', 'login', body.code);
+                    if (response && typeof response === 'object')
+                        checkTwinklyCode = translateTwinklyCode(TWINKLY_OBJ.name, 'POST', 'login', response['code']);
 
                     if (checkTwinklyCode)
                         reject(checkTwinklyCode)
                     else {
-                        TWINKLY_OBJ.token                   = body['authentication_token'];
+                        TWINKLY_OBJ.token                   = response['authentication_token'];
                         TWINKLY_OBJ.headers['X-Auth-Token'] = TWINKLY_OBJ.token;
-                        TWINKLY_OBJ.expires                 = Date.now() + (body['authentication_token_expires_in'] * 1000);
-                        TWINKLY_OBJ.challengeResponse       = body['challenge-response'];
+                        TWINKLY_OBJ.expires                 = Date.now() + (response['authentication_token_expires_in'] * 1000);
+                        TWINKLY_OBJ.challengeResponse       = response['challenge-response'];
 
-                        resolve({authentication_token            : body['authentication_token'], 
-                                 authentication_token_expires_in : body['authentication_token_expires_in'], 
-                                 'challenge-response'            : body['challenge-response'], 
-                                 code                            : body['code']});
+                        resolve({authentication_token            : response['authentication_token'], 
+                                 authentication_token_expires_in : response['authentication_token_expires_in'], 
+                                 'challenge-response'            : response['challenge-response'], 
+                                 code                            : response['code']});
                     }
                 } catch (e) {
-                        reject(`${e.name}: ${e.message}, Body: ${JSON.stringify(body)}`);
+                    reject(`${e.name}: ${e.message}`);
                 }
             })
             .catch(error => {
@@ -967,98 +968,60 @@ function createChannel(id, initValue, forceCreation = false, name = '', common =
 
 /**
 * @param {string} url
-* @param {string | {} } body
+* @param {string | {}} body
 * @param {string} method
-* @param {function | {} } addOptions
-* @return {Promise<{response: any, body: any}>}
+* @param {{}} headers
+* @return {Promise<string | {}>}
 */
-function httpRequest(url, body, method, addOptions = null) {
+function sendHTTP(url, body, method, headers = null) {
     return new Promise((resolve, reject) => {
         if (url == '') {
             reject(`invalid ${method} URL`);
             return;
         }
 
-        if (body != null && typeof body === 'string') {body = JSON.parse(body);}
-
-        const options = {
-            url                : url,
-            body               : body,
-            method             : method,
-            rejectUnauthorized : false,
-            timeout            : 3000,
-            json               : true
-        };
-
-        if (addOptions) {
-            // Wenn Funktion, dann diese Aufrufen
-            if (typeof addOptions === 'function')
-                addOptions(options);
-            // Wenn Object, dann auslesen
-            else if (typeof addOptions === 'object')
-                for (let option of Object.keys(addOptions))
-                    options[option] = addOptions[option]
-        }
+        if (headers == null) headers = {};
     
+        let data = method == 'POST' ? `-d '${body && typeof body === 'object' ? JSON.stringify(body) : body}' ` : '';
 
-        if (!USE_CURL_INSTEAD) {
-            logDebug(`[httpRequest.${method}] ${JSON.stringify(options)}`);
-            request(options, (error, response, body) => {
-                const err = error ? error : (response && response.statusCode !== 200 ? 'HTTP Error ' + response.statusCode : null);
-                if (err && body) 
-                    reject(err + ', ' + JSON.stringify(body))
-                else if (err) 
-                    reject(err)
+        // Header zusammenbasteln
+        if (!Object.keys(headers).includes('Content-Type')) headers['Content-Type'] = 'application/json';
+        let header_str = '';
+        for (let key of Object.keys(headers))
+            header_str += `-H '${key}: ${headers[key]}' `;
+        // ----------------------
+
+        let curl = `curl ${data} ${header_str} ${url}`;
+        logDebug(`[httpRequest.${method}] ${curl}`);
+
+        try {
+            exec(curl, async function (error, body, stderr) {
+                let oBody = isJsonString(body) ? JSON.parse(body) : body;
+
+                if (error && body) 
+                    reject(error + ', ' + body)
+                else if (error) 
+                    reject(error)
                 else
-                    resolve({response: response, body: body});
-            }).on("error", (e) => {
-                reject(e.message);
+                    resolve(oBody);
             });
-        } else {
-            let data    = method == 'POST'              ? `-d '${JSON.stringify(body)}' ` : '';
-            let headers = !isLikeEmpty(options.headers) ? options.headers                 : {};
-
-            // Header zusammenbasteln
-            if (!Object.keys(headers).includes('Content-Type')) headers['Content-Type'] = 'application/json';
-            let header_str = '';
-            for (let key of Object.keys(headers))
-                header_str += `-H '${key}: ${headers[key]}' `;
-            // ----------------------
-
-            let curl = `curl ${data} ${header_str} ${url}`;
-            logDebug(`[httpRequest.${method}] ${curl}`);
-
-            try {
-                exec(curl, async function (error, body, stderr) {
-                    let oBody = isJsonString(body) ? JSON.parse(body) : body;
-
-                    if (error && body) 
-                        reject(error + ', ' + body)
-                    else if (error) 
-                        reject(error)
-                    else
-                        resolve({response: null, body: oBody});
-                });
-            } catch (e) {
-                reject(e.message);
-            }
+        } catch (e) {
+            reject(e.message);
         }
     });
 }
 
 /**
 * @param {string} url
-* @param {function | {} } addOptions
-* @return {Promise<{response: any, body: any}>}
+* @param {{}} headers
+* @return {Promise<string | {}>}
 */
-function doGetRequest(url, addOptions = null) {
+function sendGetHTTP(url, headers = null) {
     return new Promise((resolve, reject) => {
-        httpRequest(url, null, 'GET', addOptions)
-        .then(({response, body}) => {
-            if (response) logDebug('[doGetRequest] response: ' + JSON.stringify(response));
-            if (body)     logDebug('[doGetRequest] body: '     + JSON.stringify(body));
-
-            resolve({response: response, body: body});
+        sendHTTP(url, '', 'GET', headers)
+        .then(response => {
+            if (response) logDebug('[sendGetHTTP] response: ' + JSON.stringify(response));
+            resolve(response);
         })
         .catch(error => {
             reject(error);
@@ -1068,18 +1031,16 @@ function doGetRequest(url, addOptions = null) {
 
 /**
 * @param {string} url
-* @param {string | {} } body
-* @param {function | {} } addOptions
-* @return {Promise<{response: any, body: any}>}
+* @param {string | {}} body
+* @param {{}} headers
+* @return {Promise<string | {}>}
 */
-function doPostRequest(url, body, addOptions = null) {
+function sendPostHTTP(url, body, headers = null) {
     return new Promise((resolve, reject) => {
-        httpRequest(url, body, 'POST', addOptions)
-        .then(({response, body}) => {
-            if (response) logDebug('[doPostRequest] response: ' + JSON.stringify(response));
-            if (body)     logDebug('[doPostRequest] body: '     + JSON.stringify(body));
-
-            resolve({response: response, body: body});
+        sendHTTP(url, body, 'POST', headers)
+        .then(response => {
+            if (response) logDebug('[sendPostHTTP] response: ' + JSON.stringify(response));
+            resolve(response);
         })
         .catch(error => {
             reject(error);
