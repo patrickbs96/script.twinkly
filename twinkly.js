@@ -930,7 +930,7 @@ const
 * @param {number} code
 */
 function translateTwinklyCode(name, mode, path, code) {
-    if (code != HTTPCodes.ok) 
+    if (code && code != HTTPCodes.ok) 
         return `[${name}.${mode}.${path}] ${code} (${HTTPCodes_TXT[code]})`;
 }
 
