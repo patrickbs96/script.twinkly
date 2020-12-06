@@ -26,9 +26,8 @@
  * Settings
  *******************************************************************************/
 const PATH_ID          = 'javascript.0.MyDevices.Twinkly.'; // Pfad für die Datenpunkte
-const POLLING_IN_SEK   = 30;                                // Wie oft sollen die Daten abgefragt werden
-const EXTENDED_LOGGING = true;                             // Mehr Informationen loggen
-const USE_CURL_INSTEAD = true;                             // Sollen die Befehle als curl anstelle vom Request versendet werden.
+const POLLING_IN_SEK   = 60;                                // Wie oft sollen die Daten abgefragt werden
+const EXTENDED_LOGGING = false;                             // Mehr Informationen loggen
 
 const devices = {
     Weihnachtsbaum : {                                   // State-Name in ioBroker
