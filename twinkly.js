@@ -24,11 +24,10 @@
 /*******************************************************************************
  * Settings
  *******************************************************************************/
-const PATH_ID = 'javascript.0.MyDevices.Twinkly.';
-
-const POLLING_IN_SEK = 60;
-
-const EXTENDED_LOGGING = false;
+const PATH_ID          = 'javascript.0.MyDevices.Twinkly.'; // Pfad für die Datenpunkte
+const POLLING_IN_SEK   = 60;                                // Wie oft sollen die Daten abgefragt werden
+const EXTENDED_LOGGING = false;                             // Mehr Informationen loggen
+const USE_CURL_INSTEAD = false;                             // Sollen die Befehle als curl anstelle vom Request versendet werden.
 
 const devices = {
     Weihnachtsbaum : {                                   // State-Name in ioBroker
@@ -746,9 +745,9 @@ class Twinkly {
                 resolve({mqtt: {broker_host         : response['broker_host'], 
                                 broker_port         : response['broker_port'], 
                                 client_id           : response['client_id'], 
-                                encryption_key_set  : response['encryption_key_set'], 
+                                user                : response['user'], 
                                 keep_alive_interval : response['keep_alive_interval'], 
-                                user                : response['user']},
+                                encryption_key_set  : response['encryption_key_set']},
                          code: response['code']});
         });
     }
@@ -757,19 +756,19 @@ class Twinkly {
      * @param {String} broker_host hostname of broker
      * @param {Number} broker_port destination port of broker
      * @param {String} client_id
+     * @param {String} user
      * @param {String} encryption_key length exactly 16 characters?
      * @param {Number} keep_alive_interval
-     * @param {String} user
      * @return {Promise<{code: Number;}>}
      */
-    async set_mqtt(broker_host, broker_port, client_id, encryption_key, keep_alive_interval, user) {
+    async set_mqtt(broker_host, broker_port, client_id, user, encryption_key, keep_alive_interval) {
         let resultError;
         const response = await this._post('mqtt/config', {broker_host         : broker_host, 
                                                           broker_port         : broker_port, 
                                                           client_id           : client_id, 
+                                                          user                : user, 
                                                           encryption_key      : encryption_key, 
-                                                          keep_alive_interval : keep_alive_interval, 
-                                                          user                : user}).catch(error => {resultError = error;});        
+                                                          keep_alive_interval : keep_alive_interval}).catch(error => {resultError = error;});        
 
         return new Promise((resolve, reject) => {
             if (resultError)
@@ -790,9 +789,9 @@ class Twinkly {
             const response = await this.set_mqtt(json.broker_host, 
                                                  json.broker_port, 
                                                  json.client_id, 
+                                                 json.user, 
                                                  json.encryption_key, 
-                                                 json.keep_alive_interval, 
-                                                 json.user).catch(error => {resultError = error;});
+                                                 json.keep_alive_interval).catch(error => {resultError = error;});
             
             return new Promise((resolve, reject) => {
                 if (resultError)
@@ -1000,15 +999,45 @@ function httpRequest(url, body, method, addOptions = null) {
                     options[option] = addOptions[option]
         }
     
-        logDebug(`[httpRequest.${method}] ${JSON.stringify(options)}`);
-        request(options, function (error, response, body) {
-            const err = error ? error : (response && response.statusCode !== 200 ? 'HTTP Error ' + response.statusCode : null)
-            if (err) reject(err + ', ' + JSON.stringify(body));
 
-            resolve({response: response, body: body});
-        }).on("error", (e) => {
-            reject(e.message);
-        });
+        if (!USE_CURL_INSTEAD) {
+            logDebug(`[httpRequest.${method}] ${JSON.stringify(options)}`);
+            request(options, (error, response, body) => {
+                const err = error ? error : (response && response.statusCode !== 200 ? 'HTTP Error ' + response.statusCode : null);
+                if (err) 
+                    reject(err + ', ' + JSON.stringify(body))
+                else
+                    resolve({response: response, body: body});
+            }).on("error", (e) => {
+                reject(e.message);
+            });
+        } else {
+            let data    = method == 'POST'              ? `-d '${JSON.stringify(body)}' ` : '';
+            let headers = !isLikeEmpty(options.headers) ? options.headers                 : {};
+
+            // Header zusammenbasteln
+            if (!Object.keys(headers).includes('Content-Type')) headers['Content-Type'] = 'application/json';
+            let header_str = '';
+            for (let key of Object.keys(headers))
+                header_str += (header_str != '' ? ' ' : '') + `${key}: ${headers[key]}`;
+            if (header_str != '') header_str = `-H '${header_str}'`;
+
+            let curl = `curl ${data}${header_str} ${url}`;
+            
+            logDebug(`[httpRequest.${method}] ${curl}`);
+            try {
+                exec(curl, async function (error, body, stderr) {
+                    let oBody = isJsonString(body) ? JSON.parse(body) : body;
+
+                    if (error) 
+                        reject(error + ', ' + body)
+                    else
+                        resolve({response: null, body: oBody});
+                });
+            } catch (e) {
+                reject(e.message);
+            }
+        }
     });
 }
 
@@ -1051,6 +1080,19 @@ function doPostRequest(url, body, addOptions = null) {
             reject(error);
         });
     });
+}
+
+/** 
+ * Checks if String is a JSON-Object
+ * @param {string} str
+ */
+function isJsonString(str) {
+    try {
+        let json = JSON.parse(str);
+        return (typeof json === 'object');
+    } catch (e) {
+        return false;
+    }
 }
 
 /**
