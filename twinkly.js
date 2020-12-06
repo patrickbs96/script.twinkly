@@ -314,13 +314,14 @@ class Twinkly {
             doPostRequest(this.base() + '/' + path, data, {headers: headers})
             .then(({response, body}) => {
                 try {
-                    if (body && typeof body === 'object') {
-                        let checkTwinklyCode = translateTwinklyCode(this.name, 'POST', path, body.code);
-                        if (checkTwinklyCode)
-                            console.warn(`${checkTwinklyCode}, Data: ${JSON.stringify(data)}, Headers: ${JSON.stringify(headers)}, Body: ${JSON.stringify(body)}`);
-                    }
+                    let checkTwinklyCode;
+                    if (body && typeof body === 'object')
+                        checkTwinklyCode = translateTwinklyCode(this.name, 'POST', path, body.code);
 
-                    resolve(body);
+                    if (checkTwinklyCode)
+                        reject(`${checkTwinklyCode}, Data: ${JSON.stringify(data)}, Headers: ${JSON.stringify(headers)}`)
+                    else
+                        resolve(body);
                 } catch (e) {
                     reject(`${e.name}: ${e.message}`);
                 }
@@ -379,13 +380,14 @@ class Twinkly {
             doGetRequest(this.base() + '/' + path, {headers: this.headers})
             .then(({response, body}) => {
                 try {
-                    if (body && typeof body === 'object') {
-                        let checkTwinklyCode = translateTwinklyCode(this.name, 'GET', path, body.code);
-                        if (checkTwinklyCode)
-                            console.warn(`${checkTwinklyCode}, Headers: ${JSON.stringify(this.headers)}, Body: ${JSON.stringify(body)}`);
-                    }
-                    
-                    resolve(body);
+                    let checkTwinklyCode;
+                    if (body && typeof body === 'object')
+                        checkTwinklyCode = translateTwinklyCode(this.name, 'GET', path, body.code);
+                
+                    if (checkTwinklyCode)
+                        reject(`${checkTwinklyCode}, Headers: ${JSON.stringify(this.headers)}`)
+                    else
+                        resolve(body);
                 } catch (e) {
                     reject(`${e.name}: ${e.message}`);
                 }
@@ -438,9 +440,8 @@ class Twinkly {
                     if (body && typeof body === 'object')
                         checkTwinklyCode = translateTwinklyCode(TWINKLY_OBJ.name, 'POST', 'login', body.code);
 
-                    if (checkTwinklyCode) {
-                        reject(checkTwinklyCode);
-                    }
+                    if (checkTwinklyCode)
+                        reject(checkTwinklyCode)
                     else {
                         TWINKLY_OBJ.token                   = body['authentication_token'];
                         TWINKLY_OBJ.headers['X-Auth-Token'] = TWINKLY_OBJ.token;
@@ -727,10 +728,10 @@ class Twinkly {
     }
 
     /** 
-     * @return {Promise<{mqtt: {broker_host: String; 
-     *                          broker_port: Number; 
-     *                          client_id: String; 
-     *                          user: String;
+     * @return {Promise<{mqtt: {broker_host : String; 
+     *                          broker_port : Number; 
+     *                          client_id   : String; 
+     *                          user        : String;
      *                          keep_alive_interval: Number; 
      *                          encryption_key_set: Boolean; }; code: Number; }>} 
      */
@@ -1004,8 +1005,10 @@ function httpRequest(url, body, method, addOptions = null) {
             logDebug(`[httpRequest.${method}] ${JSON.stringify(options)}`);
             request(options, (error, response, body) => {
                 const err = error ? error : (response && response.statusCode !== 200 ? 'HTTP Error ' + response.statusCode : null);
-                if (err) 
+                if (err && body) 
                     reject(err + ', ' + JSON.stringify(body))
+                else if (err) 
+                    reject(err)
                 else
                     resolve({response: response, body: body});
             }).on("error", (e) => {
@@ -1019,18 +1022,20 @@ function httpRequest(url, body, method, addOptions = null) {
             if (!Object.keys(headers).includes('Content-Type')) headers['Content-Type'] = 'application/json';
             let header_str = '';
             for (let key of Object.keys(headers))
-                header_str += (header_str != '' ? ' ' : '') + `${key}: ${headers[key]}`;
-            if (header_str != '') header_str = `-H '${header_str}'`;
+                header_str += `-H '${key}: ${headers[key]}' `;
+            // ----------------------
 
-            let curl = `curl ${data}${header_str} ${url}`;
-            
+            let curl = `curl ${data} ${header_str} ${url}`;
             logDebug(`[httpRequest.${method}] ${curl}`);
+
             try {
                 exec(curl, async function (error, body, stderr) {
                     let oBody = isJsonString(body) ? JSON.parse(body) : body;
 
-                    if (error) 
+                    if (error && body) 
                         reject(error + ', ' + body)
+                    else if (error) 
+                        reject(error)
                     else
                         resolve({response: null, body: oBody});
                 });
