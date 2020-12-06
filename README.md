@@ -34,3 +34,11 @@ const devices = {
 }
 ```
 connectedState ist nicht verpflichtend aber so kann das Polling gegen eine nicht existierende Verbindung (Lichterkette vom Strom getrennt) abgesichert werden.
+
+Folgende Einstellungen stehen zusätzlich noch zur Verfügung:
+``` javascript
+const PATH_ID          = 'javascript.0.MyDevices.Twinkly.'; // Pfad für die Datenpunkte
+const POLLING_IN_SEK   = 60;                                // Wie oft sollen die Daten abgefragt werden
+const EXTENDED_LOGGING = false;                             // Mehr Informationen loggen
+const USE_CURL_INSTEAD = false;                             // Sollen die Befehle als curl anstelle vom Request versendet werden.
+```
