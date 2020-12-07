@@ -43,7 +43,7 @@ function init() {
     // Verbindungen anlegen...
     for (let device of Object.keys(devices)) {
         let deviceName = devices[device].name;
-        if (isLikeEmpty(deviceName))
+        if (typeof deviceName === 'undefined')
             deviceName = device;
 
         devices[device].connect = new Twinkly(deviceName, devices[device].ipAdresse);
@@ -53,7 +53,7 @@ function init() {
         devices[device].lastAction  = '';
 
         // Soll der Ping-Adapter geprüft werden?
-        devices[device].checkConnected = !isLikeEmpty(devices[device].connectedState) && existsState(devices[device].connectedState);
+        devices[device].checkConnected = typeof devices[device].connectedState !== 'undefined' && existsState(devices[device].connectedState);
 
         // Gerät anlegen...
         createChannel(PATH_ID + device, '', false, deviceName);
@@ -1061,33 +1061,6 @@ function isJsonString(str) {
         return (typeof json === 'object');
     } catch (e) {
         return false;
-    }
-}
-
-/**
-* Checks if Array or String is not undefined, null or empty.
-* 08-Sep-2019: added check for [ and ] to also catch arrays with empty strings.
-* @param {any} inputVar - Input Array or String, Number, etc.
-* @param {boolean} onlyUndefined - Prüfung nur ob inputVar existiert
-* @return true if it is undefined/null/empty, false if it contains value(s)
-Array or String containing just whitespaces or >'< or >"< or >[< or >]< is considered empty
-*/
-function isLikeEmpty(inputVar, onlyUndefined = false) {
-    if (typeof inputVar !== 'undefined' && inputVar !== null) {
-        if (!onlyUndefined) {
-            let strTemp = JSON.stringify(inputVar);
-            strTemp = strTemp.replace(/\s+/g, '');  // remove all whitespaces
-            strTemp = strTemp.replace(/\"+/g, '');  // remove all >"<
-            strTemp = strTemp.replace(/\'+/g, '');  // remove all >'<
-            strTemp = strTemp.replace(/\[+/g, '');  // remove all >[<
-            strTemp = strTemp.replace(/\]+/g, '');  // remove all >]<
-
-            return strTemp === '';
-        } else {
-            return false;
-        }
-    } else {
-        return true;
     }
 }
 /*******************************************************************************/
