@@ -277,7 +277,7 @@ class Twinkly {
             // POST ausführen...
             await this._doPOST(path, data, headers).then(response => {result = response;}).catch(error => {resultError = error;});
 
-            if (resultError && String(resultError).includes('Invalid Token')) {
+            if (resultError && resultError == INVALID_TOKEN) {
                 resultError = null;
 
                 // Token erneuern
@@ -288,7 +288,7 @@ class Twinkly {
                     await this._doPOST(path, data, headers).then(response => {result = response;}).catch(error => {resultError = error;});
                     
                     // Wenn wieder fehlerhaft, dann Pech gehabt. Token wird gelöscht...
-                    if (resultError && String(resultError).includes('Invalid Token'))
+                    if (resultError && resultError == INVALID_TOKEN)
                         this.token = '';
                 }
             }
@@ -346,7 +346,7 @@ class Twinkly {
             // GET ausführen...
             await this._doGET(path).then(response => {result = response;}).catch(error => {resultError = error;});
 
-            if (resultError && String(resultError).includes('Invalid Token')) {
+            if (resultError && resultError == INVALID_TOKEN) {
                 resultError = null;
 
                 // Token erneuern
@@ -357,7 +357,7 @@ class Twinkly {
                     await this._doGET(path).then(response => {result = response;}).catch(error => {resultError = error;});
 
                     // Wenn wieder fehlerhaft, dann Pech gehabt. Token wird gelöscht...
-                    if (resultError && String(resultError).includes('Invalid Token'))
+                    if (resultError && resultError == INVALID_TOKEN)
                         this.token = '';
                 }
             }
@@ -920,7 +920,9 @@ const
         1103 : 'Error - value too long',
         1104 : 'Error - malformed JSON on input',
         1105 : 'Invalid argument key',
-        1106 : 'Error - Login'};
+        1106 : 'Error - Login'},
+
+    INVALID_TOKEN = 'Invalid Token';
 
 
 /**
@@ -930,7 +932,7 @@ const
 * @param {number} code
 */
 function translateTwinklyCode(name, mode, path, code) {
-    if (code && code != HTTPCodes.ok) 
+    if (code && code != HTTPCodes.ok)
         return `[${name}.${mode}.${path}] ${code} (${HTTPCodes_TXT[code]})`;
 }
 
@@ -997,10 +999,12 @@ function sendHTTP(url, body, method, headers = null) {
             exec(curl, async function (error, body, stderr) {
                 let oBody = isJsonString(body) ? JSON.parse(body) : body;
 
-                if (error && body) 
+                if (error && body)
                     reject(error + ', ' + body)
-                else if (error) 
+                else if (error)
                     reject(error)
+                else if (body.includes(INVALID_TOKEN))
+                    reject(INVALID_TOKEN)
                 else
                     resolve(oBody);
             });
