@@ -53,7 +53,7 @@ function init() {
         devices[device].lastAction  = '';
 
         // Soll der Ping-Adapter geprüft werden?
-        devices[device].checkConnected = !isLikeEmpty(devices[device].connectedState) && isState(devices[device].connectedState, true);
+        devices[device].checkConnected = !isLikeEmpty(devices[device].connectedState) && existsState(devices[device].connectedState);
 
         // Gerät anlegen...
         createChannel(PATH_ID + device, '', false, deviceName);
@@ -256,7 +256,7 @@ class Twinkly {
 
     async interview() {
         if (Object.keys(this.details).length == 0)
-            this.details = this.get_details();
+            this.details = await this.get_details();
     }
 
     /**
@@ -997,16 +997,16 @@ function sendHTTP(url, body, method, headers = null) {
 
         try {
             exec(curl, async function (error, body, stderr) {
-                let oBody = isJsonString(body) ? JSON.parse(body) : body;
+                const err = error ? String(error).includes('\n') ? String(error).substring(0, String(error).indexOf('\n')).trim() : String(error) : null;
 
-                if (error && body)
-                    reject(error + ', ' + body)
-                else if (error)
-                    reject(error)
+                if (err && body)
+                    reject(err + ', ' + body)
+                else if (err)
+                    reject(err)
                 else if (body.includes(INVALID_TOKEN))
                     reject(INVALID_TOKEN)
                 else
-                    resolve(oBody);
+                    resolve(isJsonString(body) ? JSON.parse(body) : body);
             });
         } catch (e) {
             reject(e.message);
@@ -1021,7 +1021,7 @@ function sendHTTP(url, body, method, headers = null) {
 */
 function sendGetHTTP(url, headers = null) {
     return new Promise((resolve, reject) => {
-        sendHTTP(url, '', 'GET', headers)
+        sendHTTP(url, null, 'GET', headers)
         .then(response => {
             if (response) logDebug('[sendGetHTTP] response: ' + JSON.stringify(response));
             resolve(response);
@@ -1089,26 +1089,6 @@ function isLikeEmpty(inputVar, onlyUndefined = false) {
     } else {
         return true;
     }
-}
-
-/**
- * Checks if a a given state or part of state is existing.
- * This is a workaround, as getObject() or getState() throw warnings in the log.
- * Set strict to true if the state shall match exactly. If it is false, it will add a wildcard * to the end.
- * See: https://forum.iobroker.net/topic/11354/
- * @param {string}    strStatePath     Input string of state, like 'javascript.0.switches.Osram.Bedroom'
- * @param {boolean}   [strict=false]   Optional: if true, it will work strict, if false, it will add a wildcard * to the end of the string       
- * @return {boolean}                   true if state exists, false if not
- */
-function isState(strStatePath, strict) {
-    let result = true;
-    if (strict) 
-        result = existsState(strStatePath)
-    else
-        result = $('state[id=' + strStatePath + '*]').length > 0;
-
-    console.debug(`[isState] strStatePath=<${strStatePath}, strict=${strict}, result=${result}`);
-    return result;
 }
 /*******************************************************************************/
 
