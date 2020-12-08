@@ -1,4 +1,4 @@
-# ioBroker.twinkly
+# script.twinkly
 
 Steuerung der Twinkly Lichterketten.
 
