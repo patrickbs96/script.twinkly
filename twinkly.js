@@ -993,7 +993,7 @@ function sendHTTP(url, body, method, headers = null) {
         // ----------------------
 
         let curl = `curl ${data} ${header_str} ${url}`;
-        logDebug(`[httpRequest.${method}] ${curl}`);
+        logDebug(`[sendHTTP.${method}] ${curl}`);
 
         try {
             exec(curl, async function (error, body, stderr) {
