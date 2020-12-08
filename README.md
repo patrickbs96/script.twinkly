@@ -31,7 +31,7 @@ const devices = {
         ipAdresse      : '192.168.178.53',               // IP-Adresse von der Twinkly-Lichterkette
         connectedState : 'ping.0.Twinkly_Lichterkette_2' // State mit true/false der den aktuellen Status der Lichterkette überwacht (bspw. ping, tr-064)
     }
-}
+};
 ```
 connectedState ist nicht verpflichtend aber so kann das Polling gegen eine nicht existierende Verbindung (Lichterkette vom Strom getrennt) abgesichert werden.
 
