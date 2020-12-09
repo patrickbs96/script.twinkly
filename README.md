@@ -2,7 +2,7 @@
 
 Steuerung der Twinkly Lichterketten.
 
-Für jedes angelegte Gerät werden die folgenden Informationen ausgelesen:
+##Für jedes angelegte Gerät werden die folgenden Informationen ausgelesen:
 - Mode (An/Aus)
 - Helligkeit
 - Name
@@ -11,14 +11,14 @@ Für jedes angelegte Gerät werden die folgenden Informationen ausgelesen:
 - Details
 - Firmware Version
 
-Für jedes angelegte Gerät können die folgenden Werte bearbeitet werden:
+##Für jedes angelegte Gerät können die folgenden Werte bearbeitet werden:
 - Mode (An/Aus)
 - Helligkeit
 - Name
 - MQTT
 - Timer
 
-Der Aufbau pro Gerät sieht wie folgt aus:
+##Der Aufbau pro Gerät sieht wie folgt aus:
 ``` javascript
 const devices = {
     Twinkly1 : {                                         // State-Name in ioBroker
@@ -35,7 +35,7 @@ const devices = {
 ```
 connectedState ist nicht verpflichtend aber so kann das Polling gegen eine nicht existierende Verbindung (Lichterkette vom Strom getrennt) abgesichert werden.
 
-Folgende Einstellungen stehen zusätzlich noch zur Verfügung:
+##Folgende Einstellungen stehen zusätzlich noch zur Verfügung:
 ``` javascript
 const PATH_ID          = 'javascript.0.MyDevices.Twinkly.'; // Pfad für die Datenpunkte
 const POLLING_IN_SEK   = 60;                                // Wie oft sollen die Daten abgefragt werden
